@@ -1,5 +1,13 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+Example script to test Poetry install.
+"""
+
 import requests
 
+# ****
 def fetch_random_joke():
     """
     Fetches a random joke from the Official Joke API.
@@ -26,5 +34,6 @@ def main():
     else:
         print("Failed to fetch a joke.")
 
+# ****
 if __name__ == "__main__":
     main()
