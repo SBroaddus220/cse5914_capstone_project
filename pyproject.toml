@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "cse5914-capstone-project"
+name = "tagsense"
 version = "0.1.0"
 description = ""
 authors = ["Steven Broaddus"]
