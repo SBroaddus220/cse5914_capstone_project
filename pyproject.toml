@@ -2,13 +2,20 @@
 name = "tagsense"
 version = "0.1.0"
 description = ""
-authors = ["Steven Broaddus"]
+authors = [
+    "Steven Broaddus",
+    "Guilherme Oliveira",
+    "Spencer Hurt",
+    "Jerrin Wofford",
+    "Scott Caley",
+    "Grant McGeehen",
+]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
 requests = "^2.32.3"
-
+pyqt6 = "^6.4.2"
 
 [build-system]
 requires = ["poetry-core"]

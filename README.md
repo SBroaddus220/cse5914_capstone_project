@@ -2,6 +2,9 @@
 CSE5914 Project by Team Prompt Engineers
 
 ## Description
+This project is a tag-based recommendation system that generates meaningful metadata for media files and enables intuitive search and discovery, offering a more efficient alternative to traditional browsing methods.
+
+## Getting Started
 
 ### Prerequisites
 
@@ -34,12 +37,17 @@ Run the following command to install dependencies via Poetry:
 poetry install
 ```
 
-3. Activate the Poetry Shell (to avoid having to specifically reference the virtual environment)
+3. [Optional] Activate the Poetry Shell (to avoid having to specifically reference the virtual environment)
 ```bash
 poetry shell
 ```
 
-## Running TagSense
+## Running the Application
+To run the application, simply run:
+```bash
+python ./main.py  # Poetry shell activated
+poetry run python ./main.py  # Poetry shell not activated
+```
 
 ## Authors and Acknowledgement
 Steven Broaddus (https://stevenbroaddus.com/#contact)
