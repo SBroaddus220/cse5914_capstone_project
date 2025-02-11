@@ -9,6 +9,10 @@ def main() -> None:
     model = TagExplorerModel()
     controller = TagExplorerController(model)
 
+    app.setApplicationName("TagSense")
+    app.setApplicationDisplayName("TagSense")
+    app.setOrganizationName("TagSense Inc.")
+
     def on_natural_language_query_change(text: str) -> None:
         controller.update_natural_language_query(text)
 

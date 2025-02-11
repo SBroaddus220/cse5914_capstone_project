@@ -5,7 +5,10 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QSplitter, QLineEdit, QListWidget,
     QVBoxLayout, QHBoxLayout, QListWidgetItem, QComboBox, QFrame
 )
+from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, QSize
+
+from tagsense.views.dialog_windows import MediaImport, ExportSearch, Settings, Help
 
 def _create_vlines_wrapped_widget(widget: QWidget) -> QWidget:
     """
@@ -55,6 +58,7 @@ class TagExplorerView(QMainWindow):
             parent (QWidget, optional): Optional parent widget. Defaults to None.
         """
         super().__init__(parent)
+        self.init_ui()
 
         # Main horizontal splitter for left (controls) and right (thumbnails)
         self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -153,6 +157,30 @@ class TagExplorerView(QMainWindow):
         self.tag_input.textChanged.connect(self.handle_tag_input)
         self.system_tag_list.itemClicked.connect(self.handle_tag_list_click)
         self.normal_tag_list.itemClicked.connect(self.handle_tag_list_click)
+
+    def init_ui(self):
+        # Create menu bar (encompasses menus)
+        menu_bar = self.menuBar()
+
+        file_menu = menu_bar.addMenu("File")
+        help_settings_menu = menu_bar.addMenu("Help")
+
+        # Create menu item actions
+        open_dialog_action = QAction("Import Media", self)
+        open_dialog_action.triggered.connect(lambda: MediaImport(self).exec())
+        export_dialog_action = QAction("Export Search", self)
+        export_dialog_action.triggered.connect(lambda: ExportSearch(self).exec())
+
+        settings_action = QAction("Settings", self)
+        settings_action.triggered.connect(lambda: Settings(self).exec())
+        help_action = QAction("Help", self)
+        help_action.triggered.connect(lambda: Help(self).exec())
+
+        # Add all actions to their respective menus
+        file_menu.addAction(open_dialog_action)
+        file_menu.addAction(export_dialog_action)
+        help_settings_menu.addAction(settings_action)
+        help_settings_menu.addAction(help_action)
 
     def handle_natural_language_input(self, text: str) -> None:
         """
