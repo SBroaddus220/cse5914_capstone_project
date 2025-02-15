@@ -69,8 +69,8 @@ def main() -> None:
         on_tag_selected
     )
     view.update_normal_tag_list(["common_tag_1", "common_tag_2", "common_tag_3"])
-    view.add_thumbnail("Thumbnail 1")
-    view.add_thumbnail("Thumbnail 2")
+    # view.add_thumbnail("Thumbnail 1")
+    # view.add_thumbnail("Thumbnail 2")
     view.show()
 
     sys.exit(app.exec())
