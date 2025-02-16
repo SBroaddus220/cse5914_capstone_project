@@ -65,105 +65,61 @@ class TagExplorerView(QMainWindow):
             parent (QWidget, optional): Optional parent widget. Defaults to None.
         """
         super().__init__(parent)
-        self.init_ui()
+        self.init_ui()  # Creates the menu bar and top-level menus
 
-        # Main horizontal splitter for left (controls) and right (thumbnails)
+        # Create the main splitter: left (custom sidebar) and right (content)
         self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.setCentralWidget(self.main_splitter)
 
-        # Left side big splitter
-        self.left_splitter = QSplitter(Qt.Orientation.Vertical)
+        # We'll create a vertical splitter on the left so we can have top/bottom
+        # collapsible sections. The user wants the top collapsed initially,
+        # and the bottom to take ~75% of the real estate, the "center" ~25%.
+        self.left_sidebar_vsplit = QSplitter(Qt.Orientation.Vertical)
 
-        # Top spacer for adjustable empty space
         self.top_spacer = QWidget()
-
-        # Middle splitter holds the four sections:
-        #   1) Natural language search
-        #   2) Tag search
-        #   3) System tag area (+dropdown)
-        #   4) Normal tag area (+dropdown)
-        self.content_splitter = QSplitter(Qt.Orientation.Vertical)
-
-        # Bottom spacer for adjustable empty space
+        self.center_widget_holder = QWidget()
+        self.center_layout = QVBoxLayout(self.center_widget_holder)
+        self.center_layout.setContentsMargins(0, 0, 0, 0)
+        self.center_layout.setSpacing(0)
         self.bottom_spacer = QWidget()
 
-        # Natural language search section
-        self.natural_language_input = QLineEdit()
-        self.natural_language_input.setPlaceholderText("Enter natural language query...")
+        self.left_sidebar_vsplit.addWidget(self.top_spacer)
+        self.left_sidebar_vsplit.addWidget(self.center_widget_holder)
+        self.left_sidebar_vsplit.addWidget(self.bottom_spacer)
 
-        # Tag search section
-        self.tag_input = QLineEdit()
-        self.tag_input.setPlaceholderText("Enter tag search query...")
+        # Let top and bottom be collapsible
+        self.left_sidebar_vsplit.setCollapsible(0, True)
+        self.left_sidebar_vsplit.setCollapsible(1, False)
+        self.left_sidebar_vsplit.setCollapsible(2, True)
 
-        # System tags
-        self.system_widget = QWidget()
-        self.system_layout = QVBoxLayout(self.system_widget)
-        self.system_sort_dropdown = QComboBox()
-        self.system_sort_dropdown.addItems(["System Sort A", "System Sort B"])
-        self.system_tag_list = QListWidget()
-        self.system_layout.addWidget(self.system_sort_dropdown)
-        self.system_layout.addWidget(self.system_tag_list)
+        # The user wants the top collapsed at start, the bottom to take about 75%.
+        # We'll attempt [0, 1, 3] so top is 0, center is 1, bottom is 3 => ~ 25% for center, ~75% for bottom.
+        self.left_sidebar_vsplit.setSizes([0, 1, 3])
 
-        # Normal tags
-        self.normal_widget = QWidget()
-        self.normal_layout = QVBoxLayout(self.normal_widget)
-        self.normal_sort_dropdown = QComboBox()
-        self.normal_sort_dropdown.addItems(["Normal Sort A", "Normal Sort B"])
-        self.normal_tag_list = QListWidget()
-        self.normal_layout.addWidget(self.normal_sort_dropdown)
-        self.normal_layout.addWidget(self.normal_tag_list)
+        # Add the left splitter to the main splitter
+        self.main_splitter.addWidget(self.left_sidebar_vsplit)
 
-        # Wrap each of the four sections with vertical lines
-        wrapped_natural_language_input = _create_vlines_wrapped_widget(self.natural_language_input)
-        wrapped_tag_input = _create_vlines_wrapped_widget(self.tag_input)
-        wrapped_system_widget = _create_vlines_wrapped_widget(self.system_widget)
-        wrapped_normal_widget = _create_vlines_wrapped_widget(self.normal_widget)
-
-        self.content_splitter.addWidget(wrapped_natural_language_input)
-        self.content_splitter.addWidget(wrapped_tag_input)
-        self.content_splitter.addWidget(wrapped_system_widget)
-        self.content_splitter.addWidget(wrapped_normal_widget)
-        for i in range(self.content_splitter.count()):
-            self.content_splitter.setCollapsible(i, False)
-
-        self.left_splitter.addWidget(self.top_spacer)
-        self.left_splitter.addWidget(self.content_splitter)
-        self.left_splitter.addWidget(self.bottom_spacer)
-
-        # Let top_spacer and bottom_spacer be collapsible, center always visible
-        self.left_splitter.setCollapsible(0, True)
-        self.left_splitter.setCollapsible(1, False)
-        self.left_splitter.setCollapsible(2, True)
-
-        # Explicitly set initial sizes so top is collapsed by default
-        self.left_splitter.setSizes([0, 1, 0])
-
+        # Default search
         self.current_search: FileSearchBase = AllFilesSearch()
         self.db_path: str = DB_PATH
 
-        # Create a horizontal layout for the dropdown and view buttons
+        # Create the right side widget
+        self.right_widget = QWidget()
+        self.main_splitter.addWidget(self.right_widget)
+        self.main_splitter.setStretchFactor(0, 1)
+        self.main_splitter.setStretchFactor(1, 4)
+
+        right_layout = QVBoxLayout(self.right_widget)
+        # Top controls (search dropdown, info button, view buttons)
         top_controls_layout = QHBoxLayout()
         top_controls_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Thumbnail list for grid view
-        self.thumbnail_list = QListWidget()
-        self.thumbnail_list.setViewMode(self.thumbnail_list.ViewMode.IconMode)
-        self.thumbnail_list.setFlow(self.thumbnail_list.Flow.LeftToRight)
-        self.thumbnail_list.setResizeMode(self.thumbnail_list.ResizeMode.Adjust)
-        self.thumbnail_list.setIconSize(QSize(128, 128))
-        self.thumbnail_list.setGridSize(QSize(150, 150))
-        self.thumbnail_list.setDragEnabled(False)
-        self.thumbnail_list.setMovement(self.thumbnail_list.Movement.Static)
-        # Connect double-click signal
-        self.thumbnail_list.itemDoubleClicked.connect(self.handle_thumbnail_double_click)
-
-        # Dropdown (left-aligned) + info button
+        # Dropdown + info button
         self.search_dropdown = QComboBox()
         self.search_dropdown.addItem("All Files")
         self.search_dropdown.setItemData(0, AllFilesSearch(), role=Qt.ItemDataRole.UserRole)
         self.search_dropdown.addItem("All File Metadata")
         self.search_dropdown.setItemData(1, AllFileMetadataSearch(), role=Qt.ItemDataRole.UserRole)
-
-        # When the search dropdown changes, update the current search and repopulate the view
         self.search_dropdown.currentIndexChanged.connect(self.handle_search_dropdown_change)
 
         self.info_button = QPushButton("Info")
@@ -172,61 +128,47 @@ class TagExplorerView(QMainWindow):
         left_controls = QHBoxLayout()
         left_controls.addWidget(self.search_dropdown)
         left_controls.addWidget(self.info_button)
-        left_controls.addStretch()  # push items to the left
+        left_controls.addStretch()
 
-        # Two view buttons (right-aligned)
+        # Table view & grid view
         self.table_view_button = QPushButton("Table View")
         self.grid_view_button = QPushButton("Grid View")
         self.table_view_button.clicked.connect(self.switch_to_table_view)
         self.grid_view_button.clicked.connect(self.switch_to_grid_view)
 
         right_controls = QHBoxLayout()
-        right_controls.addStretch()  # push buttons to the right
+        right_controls.addStretch()
         right_controls.addWidget(self.table_view_button)
         right_controls.addWidget(self.grid_view_button)
 
-        # Combine left and right controls into top_controls_layout
         top_controls_layout.addLayout(left_controls)
         top_controls_layout.addLayout(right_controls)
 
-        # Stacked widget for switching between table view and thumbnail list
+        # Stacked widget for table vs. thumbnail view
         self.file_view_stacked = QStackedWidget()
-        # Table
         self.table_widget = QTableWidget()
         self.table_widget.itemDoubleClicked.connect(self.handle_table_double_click)
         self.table_widget.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-
-        # self.table_widget.setColumnCount(10)  # Adjust as needed
         self.file_view_stacked.addWidget(self.table_widget)
-        # Grid (thumbnail_list already defined)
+
+        self.thumbnail_list = QListWidget()
+        self.thumbnail_list.setViewMode(self.thumbnail_list.ViewMode.IconMode)
+        self.thumbnail_list.setFlow(self.thumbnail_list.Flow.LeftToRight)
+        self.thumbnail_list.setResizeMode(self.thumbnail_list.ResizeMode.Adjust)
+        self.thumbnail_list.setIconSize(QSize(128, 128))
+        self.thumbnail_list.setGridSize(QSize(150, 150))
+        self.thumbnail_list.setDragEnabled(False)
+        self.thumbnail_list.setMovement(self.thumbnail_list.Movement.Static)
+        self.thumbnail_list.itemDoubleClicked.connect(self.handle_thumbnail_double_click)
         self.file_view_stacked.addWidget(self.thumbnail_list)
 
-        # Modify right_widget layout to include these new controls
-        self.right_widget = QWidget()
-        right_layout = QVBoxLayout(self.right_widget)
         right_layout.addLayout(top_controls_layout)
         right_layout.addWidget(self.file_view_stacked)
 
-
-        self.main_splitter.addWidget(self.left_splitter)
-        self.main_splitter.addWidget(self.right_widget)
-        self.main_splitter.setStretchFactor(0, 1)
-        self.main_splitter.setStretchFactor(1, 4)
-
-        container_layout = QHBoxLayout()
-        container_layout.addWidget(self.main_splitter)
-        container = QWidget()
-        container.setLayout(container_layout)
-        self.setCentralWidget(container)
-
-        # Connect signals
-        self.natural_language_input.textChanged.connect(self.handle_natural_language_input)
-        self.tag_input.textChanged.connect(self.handle_tag_input)
-        self.system_tag_list.itemClicked.connect(self.handle_tag_list_click)
-        self.normal_tag_list.itemClicked.connect(self.handle_tag_list_click)
-
         self.populate_file_views()
+        self.update_left_sidebar()
+
 
     def init_ui(self):
         # Create menu bar (encompasses menus)
@@ -251,6 +193,41 @@ class TagExplorerView(QMainWindow):
         file_menu.addAction(export_dialog_action)
         help_settings_menu.addAction(settings_action)
         help_settings_menu.addAction(help_action)
+
+    def update_left_sidebar(self) -> None:
+        """
+        Updates the left sidebar based on the current search's custom widget.
+        Collapses the entire left splitter if no widget is provided.
+        """
+        # Remove existing layout content from self.center_layout
+        while self.center_layout.count():
+            item = self.center_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+
+        # Get the search-provided widget (may be None)
+        widget = self.current_search.get_left_sidebar_widget(self.center_widget_holder)
+        if widget is None:
+            # Hide the entire vsplit
+            self.left_sidebar_vsplit.setVisible(False)
+            self.main_splitter.setSizes([0, 1])
+        else:
+            self.left_sidebar_vsplit.setVisible(True)
+            self.center_layout.addWidget(widget)
+            # Expand a bit
+            self.main_splitter.setSizes([1, 3])
+
+
+
+
+
+
+
+
+
+
+
 
     def handle_natural_language_input(self, text: str) -> None:
         """
@@ -283,16 +260,18 @@ class TagExplorerView(QMainWindow):
     def handle_search_dropdown_change(self, index: int) -> None:
         """
         Handles change in the search dropdown, updates the current search, and repopulates the view.
+        Also updates the left sidebar.
         """
         self.current_search = self.search_dropdown.itemData(index, role=Qt.ItemDataRole.UserRole)
         self.populate_file_views()
+        self.update_left_sidebar()
 
     def show_search_info(self) -> None:
         """
-        Displays the SQL query of the current search.
+        Displays the help text of the current search in a QMessageBox.
         """
-        query = self.current_search.get_sql()
-        QMessageBox.information(self, "Search Info", query)
+        QMessageBox.information(self, "Search Info", self.current_search.get_help_text())
+
 
     def switch_to_table_view(self) -> None:
         """
@@ -388,17 +367,6 @@ class TagExplorerView(QMainWindow):
         self.system_tag_list.clear()
         for tag in tags:
             self.system_tag_list.addItem(tag)
-
-    def update_normal_tag_list(self, tags: list[str]) -> None:
-        """
-        Updates the normal tag list with the specified tags.
-
-        Args:
-            tags (list[str]): New normal tags to display.
-        """
-        self.normal_tag_list.clear()
-        for tag in tags:
-            self.normal_tag_list.addItem(tag)
 
     def add_thumbnail(self, file_name: str) -> None:
         """

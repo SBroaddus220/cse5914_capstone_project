@@ -5,7 +5,9 @@ Base foundation for searches.
 """
 
 # **** IMPORTS ****
+from typing import Optional
 from abc import ABC, abstractmethod
+from PyQt6.QtWidgets import QWidget
 
 # **** CLASS ****
 class FileSearchBase(ABC):
@@ -32,6 +34,28 @@ class FileSearchBase(ABC):
         rows = conn.execute(self.get_sql()).fetchall()
         conn.close()
         return [dict(row) for row in rows]
+
+    def get_left_sidebar_widget(self, parent: Optional[QWidget] = None) -> Optional[QWidget]:
+        """
+        Returns an optional QWidget for the left sidebar, if this search requires input fields.
+        
+        Args:
+            parent (Optional[QWidget]): The parent widget for the sidebar.
+        
+        Returns:
+            Optional[QWidget]: The custom widget or None.
+        """
+        return None
+
+    def get_help_text(self) -> str:
+        """
+        Returns help text for the 'Info' button describing this search.
+        
+        Returns:
+            str: A message explaining how to use this search (if needed).
+        """
+        return "No additional help for this search."
+
 
 # ****
 if __name__ == "__main__":
