@@ -26,6 +26,10 @@ def main() -> None:
     # Init DBs
     db_path = Path(DB_PATH)
     logger.info(f"Initializing core tables in database at {db_path}")
+    # Creates database if not present
+    if not db_path.exists():
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        db_path.touch()
 
     conn = get_db_connection(db_path)
     try:
