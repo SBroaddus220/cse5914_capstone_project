@@ -9,6 +9,8 @@ import os
 import json
 import time
 import logging
+import hashlib
+import sqlite3
 from typing import Any, Dict
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
@@ -18,25 +20,17 @@ from PyQt6.QtWidgets import (
 )
 
 from tagsense.config import DB_PATH
-from tagsense.processes.preprocessing import FilePreprocessing, ExtractFileMetadataProcess
-from tagsense.processes.exampleprocesses.testprocesses import AppendTextProcess, SingleRunProcess
+from tagsense.util import create_divider
+from tagsense.models.data_structures.file_table.file_table import FileTable
+from tagsense.models.data_structures.file_metadata.file_metadata import FileMetadata
+from tagsense.processes.processes.file_preprocessing.file_preprocessing import FilePreprocessing
+from tagsense.processes.processes.extract_file_metadata.extract_file_metadata import ExtractFileMetadataProcess
+from tagsense.processes.processes.example01_store_text.store_text import StoreText
+from tagsense.processes.processes.example02_append_text.append_text import AppendText
 
 
 # **** LOGGING ****
 logger = logging.getLogger(__name__)
-
-# **** FUNCTIONS ****
-def create_divider(name: str, total_width: int = 50) -> str:
-    """Creates a divider line with the given name centered among dashes."""
-    prefix = "# "
-    name_len = len(name)
-    max_name_space = total_width - len(prefix)
-    if name_len >= max_name_space:
-        return f"# {name}"
-    space_for_dashes = max_name_space - name_len
-    left = space_for_dashes // 2
-    right = space_for_dashes - left
-    return prefix + ("-" * left) + name + ("-" * right)
 
 # **** CLASSES ****
 class FileImport(QDialog):
@@ -59,8 +53,8 @@ class FileImport(QDialog):
         # Optional user-selectable processes
         self.user_processes = [
             # GrayscaleImageProcess(),
-            AppendTextProcess(),
-            SingleRunProcess()
+            AppendText(),
+            StoreText()
         ]
 
         # Combine them for display; core first, then user
@@ -245,11 +239,6 @@ class FileImport(QDialog):
         is already in DB. If so, disables or unchecks certain processes if they're
         non-repeatable and already done, whether core or user-created.
         """
-        import hashlib
-        import sqlite3
-        from tagsense.models.file_table import FileTable
-        from tagsense.models.file_core_metadata import FileCoreMetadataTable
-
         logging.info("Setting file path.")
         self.file_path_lineedit.setText(file_path)
 
@@ -301,7 +290,7 @@ class FileImport(QDialog):
 
             # 4A) We already handle the core metadata table example:
             meta_row = conn.execute(
-                f"SELECT rowid FROM {FileCoreMetadataTable.TABLE_NAME} WHERE file_id = ?",
+                f"SELECT rowid FROM {FileMetadata.TABLE_NAME} WHERE file_id = ?",
                 (existing_rowid,)
             ).fetchone()
             if meta_row:

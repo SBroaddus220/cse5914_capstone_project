@@ -6,6 +6,7 @@ View module for the main window of the application.
 
 # **** IMPORTS ****
 import logging
+import sqlite3
 from typing import Callable
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import (
@@ -16,11 +17,13 @@ from PyQt6.QtGui import QPixmap, QIcon, QAction
 from PyQt6.QtWidgets import QAbstractItemView
 
 from tagsense.config import DB_PATH
+from tagsense.models.data_structures.file_table.file_table import FileTable
 from tagsense.searches.base_file_search import FileSearchBase
-from tagsense.searches.all_files.all_files_search import AllFilesSearch, AllFileMetadataSearch
+from tagsense.searches.searches.all_files.all_files_search import AllFilesSearch, AllFileMetadataSearch
 from tagsense.views.data_view_window import DataViewWindow
 
 from tagsense.views.dialog_windows.file_import import FileImport
+from tagsense.views.dialog_windows.run_processes import RunProcesses
 from tagsense.views.dialog_windows.export_search import ExportSearch
 from tagsense.views.dialog_windows.settings import Settings
 from tagsense.views.dialog_windows.help import Help
@@ -161,8 +164,10 @@ class MainWindow(QMainWindow):
         help_settings_menu = menu_bar.addMenu("Help")
 
         # Create menu item actions
-        open_dialog_action = QAction("Import Media", self)
+        open_dialog_action = QAction("Import Files", self)
         open_dialog_action.triggered.connect(lambda: FileImport(self).exec())
+        run_processes_action = QAction("Run Processes", self)
+        run_processes_action.triggered.connect(lambda: RunProcesses(self).exec())
         export_dialog_action = QAction("Export Search", self)
         export_dialog_action.triggered.connect(lambda: ExportSearch(self).exec())
 
@@ -174,6 +179,7 @@ class MainWindow(QMainWindow):
         # Add all actions to their respective menus
         file_menu.addAction(open_dialog_action)
         file_menu.addAction(export_dialog_action)
+        file_menu.addAction(run_processes_action)
         help_settings_menu.addAction(settings_action)
         help_settings_menu.addAction(help_action)
 
@@ -355,15 +361,12 @@ class MainWindow(QMainWindow):
 
     def _fetch_file_path(self, rowid: str) -> str:
         """Fetches file_path from FileTable for the given rowid."""
-        import sqlite3
-        from tagsense.models.file_table import FileTable
         conn = sqlite3.connect(self.db_path)
         record = FileTable.fetch_record(conn, rowid, "rowid")
         conn.close()
         if record:
             return record.get("file_path", "")
         return ""
-
 
 # ****
 if __name__ == "__main__":

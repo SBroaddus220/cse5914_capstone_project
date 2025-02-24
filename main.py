@@ -15,7 +15,8 @@ from tagsense.database import get_db_connection
 from tagsense.models.model import TagExplorerModel
 from tagsense.controllers.controller import TagExplorerController
 from tagsense.views.main_window import MainWindow
-from tagsense.processes.preprocessing import FileTable, FileCoreMetadataTable
+from tagsense.models.data_structures.file_table.file_table import FileTable
+from tagsense.models.data_structures.file_metadata.file_metadata import FileMetadata
 
 # **** LOGGING ****
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ def main() -> None:
     try:
         # Create only the core tables
         FileTable.create_table(conn)
-        FileCoreMetadataTable.create_table(conn)
+        FileMetadata.create_table(conn)
         
         # Verify each table has the required columns
         if not FileTable.verify_table(conn) or not FileTable.verify_table(conn):
