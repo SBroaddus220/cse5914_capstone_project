@@ -14,7 +14,7 @@ from tagsense.config import LOGGER_CONFIG, DB_PATH
 from tagsense.database import get_db_connection
 from tagsense.models.model import TagExplorerModel
 from tagsense.controllers.controller import TagExplorerController
-from tagsense.views.main_window import TagExplorerView
+from tagsense.views.main_window import MainWindow
 from tagsense.processes.preprocessing import FileTable, FileCoreMetadataTable
 
 # **** LOGGING ****
@@ -67,7 +67,7 @@ def main() -> None:
         # Example usage: removing or doing something with the selected tag
         pass
 
-    view = TagExplorerView(
+    view = MainWindow(
         on_natural_language_query_change,
         on_tag_search_change,
         on_tag_selected

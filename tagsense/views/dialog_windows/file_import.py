@@ -1,46 +1,31 @@
 # -*- coding: utf-8 -*-
 
 """
-Dialog windows for application.
+Dialog window for importing files.
 """
 
-# ****
+# **** IMPORTS ****
 import os
+import json
 import time
 import logging
-import markdown
-from typing import Dict, Any
-import json
-from PyQt6.QtWidgets import (
-    QDialog,
-    QLineEdit,
-    QPushButton,
-    QPlainTextEdit,
-    QScrollArea,
-    QVBoxLayout,
-    QHBoxLayout,
-    QCheckBox,
-    QGroupBox,
-    QWidget,
-    QLabel,
-    QMessageBox,
-    QComboBox,
-    QTextEdit,
-    QSplitter,
-)
+from typing import Any, Dict
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QFileDialog
+from PyQt6.QtWidgets import (
+    QDialog, QHBoxLayout, QVBoxLayout, QSplitter, QGroupBox, QWidget, QCheckBox,
+    QLabel, QLineEdit, QPlainTextEdit, QPushButton, QFileDialog, QMessageBox,
+    QScrollArea
+)
 
 from tagsense.config import DB_PATH
 from tagsense.processes.preprocessing import FilePreprocessing, ExtractFileMetadataProcess
-# from tagsense.processes.grayscale.grayscale import GrayscaleImageProcess
 from tagsense.processes.exampleprocesses.testprocesses import AppendTextProcess, SingleRunProcess
 
+
 # **** LOGGING ****
-# Set up logger
 logger = logging.getLogger(__name__)
 
-# **** Helper Functions ****
+# **** FUNCTIONS ****
 def create_divider(name: str, total_width: int = 50) -> str:
     """Creates a divider line with the given name centered among dashes."""
     prefix = "# "
@@ -53,13 +38,13 @@ def create_divider(name: str, total_width: int = 50) -> str:
     right = space_for_dashes - left
     return prefix + ("-" * left) + name + ("-" * right)
 
-# **** Dialog Windows ****
-class MediaImport(QDialog):
-    """Dialog for importing media files and running processes."""
+# **** CLASSES ****
+class FileImport(QDialog):
+    """Dialog for importing files and running processes."""
 
     def __init__(self, parent=None):
         """
-        Initializes the MediaImport dialog and its UI elements.
+        Initializes the FileImport dialog and its UI elements.
         """
         super().__init__(parent)
         self.setWindowTitle("Import Media")
@@ -548,103 +533,7 @@ class MediaImport(QDialog):
             if cb.isChecked()  # do not check cb.isEnabled()
         ]
         self.process_button.setEnabled(bool(active_indices))
-
-
-class ExportSearch(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Export Search")
-        self.setGeometry(100, 100, 400, 200)
-        self.init_ui()
-
-    def init_ui(self):
-        layout = QVBoxLayout()
-
-        # Checkbox for including metadata
-        self.metadata_checkbox = QCheckBox("Include metadata", self)
-        layout.addWidget(self.metadata_checkbox)
-
-        # Dropdown for selecting export file type
-        self.file_type_dropdown = QComboBox(self)
-        self.file_type_dropdown.addItems(["CSV", "JSON"])
-        layout.addWidget(self.file_type_dropdown)
-
-        # Save button
-        self.save_button = QPushButton("Save", self)
-        self.save_button.clicked.connect(self.open_save_dialog)
-        layout.addWidget(self.save_button)
-
-        self.setLayout(layout)
-
-    #TODO (get details from user selections, etc)
-    def build_file_to_save(self):
-       ... 
-
-    #TODO (finish)
-    def open_save_dialog(self):
-
-        file_dialog = QFileDialog(self)
-        file_dialog.setWindowTitle("Save File")
-        file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
-        file_dialog.setViewMode(QFileDialog.ViewMode.Detail)
         
-        if file_dialog.exec():
-           selected_file = file_dialog.selectedFiles()[0]
-           print("Selected File for Saving:", selected_file)
-           self.accept() # this automatically closes the dialog window
-
-class Settings(QDialog):
-   def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Settings")
-        self.setGeometry(100, 100, 300, 150)
-        self.init_ui()
-        
-   def init_ui(self):
-        layout = QVBoxLayout()
-
-        # Placeholder switches
-        self.switch1 = QCheckBox("Enable Feature 1", self)
-        self.switch2 = QCheckBox("Enable Feature 2", self)
-        layout.addWidget(self.switch1)
-        layout.addWidget(self.switch2)
-
-        # Save button
-        self.save_button = QPushButton("Save", self)
-        self.save_button.clicked.connect(self.accept)  # Closes the dialog
-        layout.addWidget(self.save_button)
-
-        self.setLayout(layout)
-
-class Help(QDialog):
-   def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Help")
-        self.setGeometry(100, 100, 400, 300)
-        self.init_ui()
-
-   def init_ui(self):
-        layout = QVBoxLayout()
-
-        # Help dialog window content is stored in a separate Markdwon file.
-        # help_content.md
-        # Edits and alterations must be made there.
-        with open("tagsense/views/help_content.md", "r") as file:
-            markdown_content = file.read()
-
-        help_text = markdown.markdown(markdown_content)
-        
-        self.help_label = QLabel("Help Guide", self)
-        self.help_content = QTextEdit(self)
-        self.help_content.setHtml(help_text)
-        self.help_content.setReadOnly(True)
-
-        layout.addWidget(self.help_label)
-        layout.addWidget(self.help_content)
-        
-        self.setLayout(layout)
-
-
 # ****
 if __name__ == "__main__":
-    raise Exception("This file is not meant to run on its own.")
+    raise Exception("This file is not meant to run standalone.")

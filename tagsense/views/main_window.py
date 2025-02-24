@@ -1,51 +1,35 @@
-"""View module for the tag-based explorer application."""
+# -*- coding: utf-8 -*-
 
+"""
+View module for the main window of the application.
+"""
+
+# **** IMPORTS ****
 import logging
 from typing import Callable
-from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QSplitter, QLineEdit, QListWidget,
-    QVBoxLayout, QHBoxLayout, QListWidgetItem, QComboBox, QFrame, QPushButton, QStackedWidget, QTableWidget,
-    QTableWidgetItem, QMessageBox, QHeaderView, QDialog, QLabel, QScrollArea, QAbstractItemView
-)
-from PyQt6.QtGui import QAction, QPixmap, QIcon
 from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QSplitter, QVBoxLayout, QHBoxLayout, QStackedWidget, QComboBox, QPushButton, 
+    QTableWidget, QHeaderView, QTableWidgetItem, QListWidget, QListWidgetItem, QMessageBox
+)
+from PyQt6.QtGui import QPixmap, QIcon, QAction
+from PyQt6.QtWidgets import QAbstractItemView
 
 from tagsense.config import DB_PATH
 from tagsense.searches.base_file_search import FileSearchBase
 from tagsense.searches.all_files.all_files_search import AllFilesSearch, AllFileMetadataSearch
-from tagsense.views.dialog_windows import MediaImport, ExportSearch, Settings, Help
+from tagsense.views.data_view_window import DataViewWindow
 
+from tagsense.views.dialog_windows.file_import import FileImport
+from tagsense.views.dialog_windows.export_search import ExportSearch
+from tagsense.views.dialog_windows.settings import Settings
+from tagsense.views.dialog_windows.help import Help
+
+# **** LOGGING ****
 logger = logging.getLogger(__name__)
 
-def _create_vlines_wrapped_widget(widget: QWidget) -> QWidget:
-    """
-    Wraps the given widget with vertical lines on each side.
-    
-    Args:
-        widget (QWidget): The widget to wrap.
-    
-    Returns:
-        QWidget: A new widget containing the original widget with two vertical lines.
-    """
-    container = QWidget()
-    layout = QHBoxLayout(container)
-    layout.setContentsMargins(0, 0, 0, 0)
-    layout.setSpacing(0)
-
-    left_line = QFrame()
-    left_line.setFrameShape(QFrame.Shape.VLine)
-    left_line.setFrameShadow(QFrame.Shadow.Sunken)
-
-    right_line = QFrame()
-    right_line.setFrameShape(QFrame.Shape.VLine)
-    right_line.setFrameShadow(QFrame.Shadow.Sunken)
-
-    layout.addWidget(left_line)
-    layout.addWidget(widget)
-    layout.addWidget(right_line)
-    return container
-
-class TagExplorerView(QMainWindow):
+# **** CLASSES ****
+class MainWindow(QMainWindow):
     """Main window for the tag-based explorer."""
 
     def __init__(
@@ -56,7 +40,7 @@ class TagExplorerView(QMainWindow):
         parent: QWidget = None
     ) -> None:
         """
-        Initializes the TagExplorerView.
+        Initializes the MainWindow.
 
         Args:
             on_natural_language_query_change (Callable[[str], None]): Callback for natural language input changes.
@@ -169,7 +153,6 @@ class TagExplorerView(QMainWindow):
         self.populate_file_views()
         self.update_left_sidebar()
 
-
     def init_ui(self):
         # Create menu bar (encompasses menus)
         menu_bar = self.menuBar()
@@ -179,7 +162,7 @@ class TagExplorerView(QMainWindow):
 
         # Create menu item actions
         open_dialog_action = QAction("Import Media", self)
-        open_dialog_action.triggered.connect(lambda: MediaImport(self).exec())
+        open_dialog_action.triggered.connect(lambda: FileImport(self).exec())
         export_dialog_action = QAction("Export Search", self)
         export_dialog_action.triggered.connect(lambda: ExportSearch(self).exec())
 
@@ -217,17 +200,6 @@ class TagExplorerView(QMainWindow):
             self.center_layout.addWidget(widget)
             # Expand a bit
             self.main_splitter.setSizes([1, 3])
-
-
-
-
-
-
-
-
-
-
-
 
     def handle_natural_language_input(self, text: str) -> None:
         """
@@ -272,7 +244,6 @@ class TagExplorerView(QMainWindow):
         """
         QMessageBox.information(self, "Search Info", self.current_search.get_help_text())
 
-
     def switch_to_table_view(self) -> None:
         """
         Switches the stacked widget to show the table view.
@@ -284,7 +255,6 @@ class TagExplorerView(QMainWindow):
         Switches the stacked widget to show the thumbnail (grid) view.
         """
         self.file_view_stacked.setCurrentIndex(1)
-
 
     def populate_file_views(self) -> None:
         """
@@ -336,8 +306,6 @@ class TagExplorerView(QMainWindow):
             thumbnail_item.setData(Qt.ItemDataRole.UserRole, rowid)
             self.thumbnail_list.addItem(thumbnail_item)
 
-
-
     def handle_table_double_click(self, item: QTableWidgetItem) -> None:
         """Opens detail window when a user double-clicks a table cell."""
         if self.rowid_col_idx is None:
@@ -350,12 +318,6 @@ class TagExplorerView(QMainWindow):
         """Opens detail window when a user double-clicks a thumbnail item."""
         rowid = item.data(Qt.ItemDataRole.UserRole)
         self.open_detail_window(rowid)
-
-
-
-
-
-
 
     def update_system_tag_list(self, tags: list[str]) -> None:
         """
@@ -388,7 +350,7 @@ class TagExplorerView(QMainWindow):
         Opens a new, non-blocking window showing the image (if any) for the given rowid,
         preserving aspect ratio, and closing on double-click.
         """
-        window = ImageWindow(self, rowid, self.db_path)
+        window = DataViewWindow(self, rowid, self.db_path)
         window.show()
 
     def _fetch_file_path(self, rowid: str) -> str:
@@ -403,78 +365,6 @@ class TagExplorerView(QMainWindow):
         return ""
 
 
-class ClickableLabel(QLabel):
-    """A QLabel that closes its top-level parent window when double-clicked."""
-    def mouseDoubleClickEvent(self, event):
-        self.window().close()
-        super().mouseDoubleClickEvent(event)
-
-
-
-class ImageWindow(QMainWindow):
-    """Window to display an image while maintaining aspect ratio, closing on double-click."""
-
-    def __init__(self, parent: QWidget, rowid: str, db_path: str) -> None:
-        super().__init__(parent)
-        self._original_pixmap = QPixmap()
-        self.setWindowTitle(f"Details for rowid = {rowid}")
-        self.showMaximized()
-        self._db_path = db_path
-        self._rowid = rowid
-
-        # Make sure this attribute is defined before _load_pixmap is called
-
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        self.container = QWidget()
-        self.layout = QVBoxLayout(self.container)
-
-        self.label = ClickableLabel()
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.layout.addWidget(self.label)
-
-        self.container.setLayout(self.layout)
-        scroll_area.setWidget(self.container)
-        self.setCentralWidget(scroll_area)
-
-        self._load_pixmap()
-
-    def _load_pixmap(self) -> None:
-        import sqlite3
-        from tagsense.models.file_table import FileTable
-        conn = sqlite3.connect(self._db_path)
-        record = FileTable.fetch_record(conn, self._rowid, "rowid")
-        conn.close()
-
-        if not record:
-            self.label.setText(f"No database record found for rowid {self._rowid}")
-            return
-
-        file_path = record.get("file_path", "")
-        pm = QPixmap(file_path)
-        if pm.isNull():
-            self.label.setText(f"No valid image for rowid {self._rowid}")
-            return
-
-        self._original_pixmap = pm
-        self._update_scaled_pixmap()
-
-    def _update_scaled_pixmap(self) -> None:
-        if self._original_pixmap.isNull():
-            return
-        available_size = self.container.size()
-        scaled_pm = self._original_pixmap.scaled(
-            available_size.width(),
-            available_size.height(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        self.label.setPixmap(scaled_pm)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._update_scaled_pixmap()
-
-    def mouseDoubleClickEvent(self, event):
-        self.close()
-        super().mouseDoubleClickEvent(event)
+# ****
+if __name__ == "__main__":
+    raise Exception("This module is not meant to be run on its own.")
