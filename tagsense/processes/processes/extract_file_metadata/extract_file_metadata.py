@@ -152,22 +152,26 @@ class ExtractFileMetadataProcess(BaseProcess):
             color_profile = img.info.get("icc_profile", None)
             compression_profile = img.info.get("compression", None)
 
-            exif_data = {}
-            if hasattr(img, "_getexif") and img._getexif():
-                raw_exif = img._getexif()
-                for tag_id, value in raw_exif.items():
-                    tag_name = ExifTags.TAGS.get(tag_id, tag_id)
-                    # Convert any type that isn't natively JSON-serializable to string
-                    exif_data[tag_name] = str(value)
-
             metadata_dict = {
                 "dimensions": f"{width}x{height}",
                 "color_depth": color_depth,
                 "color_profile": bool(color_profile),
                 "dpi": dpi,
-                "compression_profile": compression_profile,
-                "exif": exif_data,
+                "compression_profile": compression_profile
             }
+            
+            exif_data = {}
+            if hasattr(img, "_getexif") and img.getexif():
+                raw_exif = img.getexif()
+                for tag_id in raw_exif:
+                    tag_name = ExifTags.TAGS.get(tag_id, tag_id)
+                    data = raw_exif.get(tag_id)
+                    if isinstance(data, bytes):
+                        data = data.decode()
+                    # Convert any type that isn't natively JSON-serializable to string
+                    exif_data[tag_name] = str(data)
+
+                metadata_dict["exif"] = exif_data
         except Exception as e:
             logger.error(f"Failed to extract image metadata: {e}")
             metadata_dict = {"error": f"Could not extract image metadata: {e}"}
