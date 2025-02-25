@@ -14,7 +14,7 @@ from tagsense.models.base_table import BaseTable
 logger = logging.getLogger(__name__)
 
 # **** CLASS ****
-class FileCoreMetadataTable(BaseTable):
+class FileMetadata(BaseTable):
     """
     Table to store the core metadata for imported files.
     """
