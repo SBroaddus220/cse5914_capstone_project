@@ -109,6 +109,9 @@ class BaseTable:
         actual_columns = {row[1] for row in cursor.fetchall()}
         return required_columns.issubset(actual_columns)
 
+    def __new__(cls, *args, **kwargs):
+        raise TypeError("This class cannot be instantiated.")
+
 # ****
 if __name__ == "__main__":
     raise Exception("This file is not meant to run on its own.")

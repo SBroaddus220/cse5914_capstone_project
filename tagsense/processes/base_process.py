@@ -22,8 +22,10 @@ class BaseProcess:
 
     TABLE_CLASS = None  # Subclasses can override with a BaseTable subclass
     can_repeat: bool = False
+    requires_installation: bool = False
 
-    def execute(self, db_path: str, param: Any, output_callback=None) -> Any:
+    @classmethod
+    def execute(cls, db_path: str, param: Any, output_callback=None) -> Any:
         """
         Default execute method. Subclasses typically override this
         to perform their specific actions. This method can still
@@ -40,24 +42,35 @@ class BaseProcess:
             Any: A message or result of the process (string, rowid, etc.).
         """
         import sqlite3
-        if self.TABLE_CLASS is not None:
+        if cls.TABLE_CLASS is not None:
             conn = sqlite3.connect(db_path)
-            self.create_tables(conn)
+            cls.create_tables(conn)
             conn.close()
         if output_callback:
-            output_callback("BaseProcess executed.\n")
-        return "BaseProcess executed."
+            output_callback(f"{cls.__name__} executed.\n")
+        return f"{cls.__name__} executed."
 
-    def create_tables(self, conn) -> None:
+    @classmethod
+    def create_tables(cls, conn) -> None:
         """
         Creates the table for this process if TABLE_CLASS is defined.
         
         Args:
             conn (sqlite3.Connection): The SQLite connection.
         """
-        if self.TABLE_CLASS is not None:
-            self.TABLE_CLASS.create_table(conn)
+        if cls.TABLE_CLASS is not None:
+            cls.TABLE_CLASS.create_table(conn)
 
+    @classmethod
+    def install(cls) -> None:
+        """
+        Subclasses that require installation should override this method.
+        """
+        if cls.requires_installation:
+            raise NotImplementedError(f"{cls.__name__} requires installation, but no method is defined.")
+
+    def __new__(cls, *args, **kwargs):
+        raise TypeError("This class cannot be instantiated.")
 
 
 # ****

@@ -5,11 +5,13 @@ Fundamental file preprocessing.
 """
 
 # **** IMPORTS ****
+import os
 import shutil
 import logging
 import sqlite3
 import hashlib
 from typing import Any
+from datetime import datetime
 
 from tagsense.config import CLIENT_FILES_DIR
 from tagsense.processes.base_process import BaseProcess
@@ -26,7 +28,8 @@ class FilePreprocessing(BaseProcess):
     TABLE_CLASS = FileTable
     can_repeat: bool = True
 
-    def execute(self, db_path: str, param: Any, output_callback=None) -> int:
+    @classmethod
+    def execute(cls, db_path: str, param: Any, output_callback=None) -> int:
         super().execute(db_path, param, output_callback)
         file_path = str(param)
 
@@ -38,7 +41,7 @@ class FilePreprocessing(BaseProcess):
             conn = sqlite3.connect(db_path)
             conn.row_factory = sqlite3.Row
 
-            md5_hash = self._calculate_md5(file_path)
+            md5_hash = cls._calculate_md5(file_path)
             if output_callback:
                 output_callback(f"Calculated MD5: {md5_hash}\n")
 
@@ -46,10 +49,6 @@ class FilePreprocessing(BaseProcess):
                 f"SELECT * FROM {FileTable.TABLE_NAME} WHERE md5_hash = ?",
                 (md5_hash,)
             ).fetchone()
-
-            # Gather the "new" data to potentially append
-            import os
-            from datetime import datetime
 
             new_basename = os.path.basename(file_path)
             new_ctime = datetime.fromtimestamp(os.path.getctime(file_path)).isoformat()
@@ -143,6 +142,7 @@ class FilePreprocessing(BaseProcess):
                 output_callback(err_msg + "\n")
             return -1
 
+    @classmethod
     def _calculate_md5(self, file_path: str) -> str:
         """
         Calculates the MD5 hash of a given file.

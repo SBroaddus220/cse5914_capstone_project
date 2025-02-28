@@ -24,7 +24,8 @@ class AppendText(BaseProcess):
     TABLE_CLASS = AppendedText
     can_repeat: bool = True
 
-    def execute(self, db_path: str, param: Any, output_callback=None) -> str:
+    @classmethod
+    def execute(cls, db_path: str, param: Any, output_callback=None) -> str:
         """
         Append some text for the given file. Expects 'param' to be the
         file's rowid. If there's no existing record, create one; if

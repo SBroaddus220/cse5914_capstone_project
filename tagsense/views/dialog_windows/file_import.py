@@ -11,6 +11,7 @@ import time
 import logging
 import hashlib
 import sqlite3
+from pathlib import Path
 from typing import Any, Dict
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
@@ -19,15 +20,15 @@ from PyQt6.QtWidgets import (
     QScrollArea
 )
 
+from tagsense import registry
 from tagsense.config import DB_PATH
-from tagsense.util import create_divider
+from tagsense.util import create_divider, discover_classes
+from tagsense.processes.base_process import BaseProcess
 from tagsense.models.data_structures.file_table.file_table import FileTable
 from tagsense.models.data_structures.file_metadata.file_metadata import FileMetadata
-from tagsense.processes.processes.file_preprocessing.file_preprocessing import FilePreprocessing
-from tagsense.processes.processes.extract_file_metadata.extract_file_metadata import ExtractFileMetadataProcess
-from tagsense.processes.processes.example01_store_text.store_text import StoreText
-from tagsense.processes.processes.example02_append_text.append_text import AppendText
 
+from tagsense.processes.preprocessing.file_preprocessing.file_preprocessing import FilePreprocessing
+from tagsense.processes.preprocessing.extract_file_metadata.extract_file_metadata import ExtractFileMetadataProcess
 
 # **** LOGGING ****
 logger = logging.getLogger(__name__)
@@ -46,17 +47,13 @@ class FileImport(QDialog):
 
         # Core (mandatory) processes that cannot be deselected
         self.core_processes = [
-            FilePreprocessing(),
-            ExtractFileMetadataProcess()
+            FilePreprocessing,
+            ExtractFileMetadataProcess
         ]
 
-        # Optional user-selectable processes
-        self.user_processes = [
-            # GrayscaleImageProcess(),
-            AppendText(),
-            StoreText()
-        ]
-
+        # Fetch installed user processes
+        self.user_processes = list(registry.installed_processes)
+        
         # Combine them for display; core first, then user
         self.process_list = self.core_processes + self.user_processes
 
@@ -184,7 +181,7 @@ class FileImport(QDialog):
             checkbox = QCheckBox()
             checkbox.clicked.connect(self.update_process_button_state)
 
-            lineedit = QLineEdit(process.__class__.__name__)
+            lineedit = QLineEdit(process.__name__)
             status_lineedit = QLineEdit("Not Started")
             status_lineedit.setReadOnly(True)
 
@@ -255,11 +252,11 @@ class FileImport(QDialog):
             if process in self.core_processes:
                 cb.setChecked(True)
                 cb.setDisabled(True)
-                lineedit.setText(process.__class__.__name__)
+                lineedit.setText(process.__name__)
             else:
                 cb.setChecked(False)
                 cb.setDisabled(False)
-                lineedit.setText(process.__class__.__name__)
+                lineedit.setText(process.__name__)
 
         # 2) Display file info
         file_info = self.get_file_info(file_path)
@@ -325,7 +322,7 @@ class FileImport(QDialog):
                             self.process_lineedits[i].text() + " (Already Done)"
                         )
                         self.output_text.appendPlainText(
-                            f"{proc.__class__.__name__} already done, can't repeat -> disabled.\n"
+                            f"{proc.__name__} already done, can't repeat -> disabled.\n"
                         )
 
         conn.close()
@@ -481,13 +478,13 @@ class FileImport(QDialog):
         """
         Shows a small help window in markdown style (basic text here, no advanced markdown rendering).
         """
-        logging.info(f"Showing help for {process_obj.__class__.__name__}.")
+        logging.info(f"Showing help for {process_obj.__name__}.")
         help_dialog = QDialog(self)
-        help_dialog.setWindowTitle(f"Help: {process_obj.__class__.__name__}")
+        help_dialog.setWindowTitle(f"Help: {process_obj.__name__}")
         layout = QVBoxLayout()
         help_text = QPlainTextEdit()
         help_text.setReadOnly(True)
-        help_text.setPlainText(f"**Help for {process_obj.__class__.__name__}**\n\n"
+        help_text.setPlainText(f"**Help for {process_obj.__name__}**\n\n"
                                f"This process does the following:\n"
                                f"{process_obj.__doc__}\n\n"
                                "More documentation can be added here in Markdown format.")

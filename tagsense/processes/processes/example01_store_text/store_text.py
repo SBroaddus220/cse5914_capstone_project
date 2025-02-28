@@ -24,7 +24,8 @@ class StoreText(BaseProcess):
     TABLE_CLASS = StoredText
     can_repeat: bool = False
 
-    def execute(self, db_path: str, param: Any, output_callback=None) -> str:
+    @classmethod
+    def execute(cls, db_path: str, param: Any, output_callback=None) -> str:
         """
         Stores a single run entry in single_run_process_records. Expects
         'param' to be the file's rowid. If there's already an entry for

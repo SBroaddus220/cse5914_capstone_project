@@ -29,7 +29,8 @@ class ExtractFileMetadataProcess(BaseProcess):
     TABLE_CLASS = FileMetadata
     can_repeat: bool = False
 
-    def execute(self, db_path: str, param: Any, output_callback=None) -> str:
+    @classmethod
+    def execute(cls, db_path: str, param: Any, output_callback=None) -> str:
         """
         Main entry point for metadata extraction. Expects a rowid (int).
         Resolves the file path from DB, extracts metadata, and inserts
@@ -66,7 +67,7 @@ class ExtractFileMetadataProcess(BaseProcess):
             file_extension = file_record["file_extension"].lower()
 
             # Extract metadata
-            metadata_dict = self._extract_metadata_for_filetype(file_extension, file_path)
+            metadata_dict = cls._extract_metadata_for_filetype(file_extension, file_path)
             if output_callback:
                 output_callback(f"Extracted metadata: {metadata_dict}\n")
 
@@ -90,8 +91,9 @@ class ExtractFileMetadataProcess(BaseProcess):
             return err_msg
 
 
+    @classmethod
     def _fetch_fundamental_record(
-        self, conn: sqlite3.Connection, file_path: str
+        cls, conn: sqlite3.Connection, file_path: str
     ) -> Optional[Dict[str, Any]]:
         """
         Fetches the fundamental file record by matching on file_path.
@@ -116,7 +118,8 @@ class ExtractFileMetadataProcess(BaseProcess):
         desc = [d[0] for d in cursor.description]
         return dict(zip(desc, row))
 
-    def _extract_metadata_for_filetype(self, file_extension: str, file_path: str) -> Dict[str, Any]:
+    @classmethod
+    def _extract_metadata_for_filetype(cls, file_extension: str, file_path: str) -> Dict[str, Any]:
         """
         Dispatch method to extract metadata based on file extension.
 
@@ -129,12 +132,13 @@ class ExtractFileMetadataProcess(BaseProcess):
         """
         # You could expand this with more elif statements for different file types
         if file_extension in [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif"]:
-            return self._extract_image_metadata(file_path)
+            return cls._extract_image_metadata(file_path)
         else:
             # Placeholder: no specialized extraction
             return {"info": "No specialized metadata extraction for this file type."}
 
-    def _extract_image_metadata(self, file_path: str) -> Dict[str, Any]:
+    @classmethod
+    def _extract_image_metadata(cls, file_path: str) -> Dict[str, Any]:
         metadata_dict: Dict[str, Any] = {}
         try:
             img = Image.open(file_path)

@@ -15,10 +15,9 @@ from PyQt6.QtWidgets import (
     QScrollBar
 )
 
+from tagsense import registry
 from tagsense.config import DB_PATH
 from tagsense.util import create_divider
-from tagsense.processes.processes.example01_store_text.store_text import StoreText
-from tagsense.processes.processes.example02_append_text.append_text import AppendText
 
 # **** LOGGER ****
 # Sets up logger
@@ -42,14 +41,8 @@ class RunProcesses(QDialog):
         self.setWindowTitle("Run Processes Without Files")
         self.setGeometry(100, 100, 600, 500)
 
-        # User processes (example repeatable and single-run).
-        self.user_processes = [
-            AppendText(),
-            StoreText()
-        ]
-
-        # Combine them for display (in this case, just the user processes).
-        self.process_list = self.user_processes
+        # Fetch all user processes
+        self.process_list = list(registry.installed_processes)
 
         # Define key widgets
         self.param_label = QLabel("Parameter (optional):")
@@ -147,7 +140,7 @@ class RunProcesses(QDialog):
             checkbox = QCheckBox()
             checkbox.clicked.connect(self.update_process_button_state)
 
-            lineedit = QLineEdit(process.__class__.__name__)
+            lineedit = QLineEdit(process.__name__)
             status_lineedit = QLineEdit("Not Started")
             status_lineedit.setReadOnly(True)
 
@@ -301,15 +294,15 @@ class RunProcesses(QDialog):
         Args:
             process_obj (Any): The process object for which to show help.
         """
-        logger.info(f"Showing help for {process_obj.__class__.__name__}.")
+        logger.info(f"Showing help for {process_obj.__name__}.")
         from PyQt6.QtWidgets import QDialog, QVBoxLayout, QPlainTextEdit, QPushButton
         help_dialog = QDialog(self)
-        help_dialog.setWindowTitle(f"Help: {process_obj.__class__.__name__}")
+        help_dialog.setWindowTitle(f"Help: {process_obj.__name__}")
         layout = QVBoxLayout()
         help_text = QPlainTextEdit()
         help_text.setReadOnly(True)
         help_text.setPlainText(
-            f"**Help for {process_obj.__class__.__name__}**\n\n"
+            f"**Help for {process_obj.__name__}**\n\n"
             f"{process_obj.__doc__}\n"
             "This process does not require a file-based parameter.\n"
         )

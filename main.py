@@ -10,6 +10,10 @@ import logging
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication
 
+from tagsense import registry
+from tagsense.util import discover_classes
+from tagsense.processes.base_process import BaseProcess
+
 from tagsense.config import LOGGER_CONFIG, DB_PATH
 from tagsense.database import get_db_connection
 from tagsense.models.model import TagExplorerModel
@@ -45,6 +49,22 @@ def main() -> None:
             sys.exit(1)
     finally:
         conn.close()
+
+    # ****
+    # Register and install processes if no installation required
+    discover_classes(Path(__file__).parent / "tagsense" / "processes" / "processes", BaseProcess)
+    for process in registry.class_registry:
+        process: BaseProcess
+        process_name = process.__name__ 
+        if process.requires_installation:
+            logger.info(f"Skipping installation of {process_name}")
+            continue
+        if registry.is_installed(process):
+            logger.info(f"{process_name} already installed")
+            continue
+        logger.info(f"Installing {process_name}...")
+        process.install()
+        registry.mark_installed(process)
     
     # ****
     # Init GUI 
