@@ -22,7 +22,7 @@ class AppendText(BaseProcess):
     'append_text_process_records'. This can be run multiple times
     for the same file.
     """
-    TABLE_CLASS = AppendedText
+    data_structures = [AppendedText]
     can_repeat: bool = True
 
     @classmethod
@@ -44,7 +44,7 @@ class AppendText(BaseProcess):
 
             # Check if we already have a record in append_text_process_records for this file
             existing = conn.execute(
-                f"SELECT * FROM {AppendedText.TABLE_NAME} WHERE file_id = ?",
+                f"SELECT * FROM {cls.data_structures[0].TABLE_NAME} WHERE file_id = ?",
                 (row_id,)
             ).fetchone()
 
@@ -54,7 +54,7 @@ class AppendText(BaseProcess):
                 old_text = existing["appended_text"] or ""
                 updated_text = old_text + "\n" + new_text
 
-                AppendedText.update_record(
+                cls.data_structures[0].update_record(
                     conn,
                     existing["rowid"],
                     {"appended_text": updated_text},
@@ -64,7 +64,7 @@ class AppendText(BaseProcess):
             else:
                 # Otherwise, create a new record
                 data = {"file_id": row_id, "appended_text": new_text}
-                AppendedText.insert_record(conn, data)
+                cls.data_structures[0].insert_record(conn, data)
                 msg = f"Created new append_text_process_records entry for file_id={row_id}."
 
             conn.close()

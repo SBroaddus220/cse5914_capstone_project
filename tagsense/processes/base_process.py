@@ -6,9 +6,10 @@ Base foundation for processes.
 
 # **** IMPORTS ****
 import logging
-from typing import Any
+from typing import Any, List
 
 from tagsense.database import get_db_connection
+from tagsense.models.base_table import BaseTable
 
 # **** LOGGING ****
 logger = logging.getLogger(__name__)
@@ -17,12 +18,12 @@ logger = logging.getLogger(__name__)
 class BaseProcess:
     """
     Base class for file processes.
-    Each process can optionally define a TABLE_CLASS that inherits from BaseTable
+    Each process can optionally referene data structures to identify formats for input/output data.
     for storing process-specific data. The create_tables method will handle
     initialization of that table, if defined.
     """
 
-    TABLE_CLASS = None  # Subclasses can override with a BaseTable subclass
+    data_structures: List[BaseTable] = None
     can_repeat: bool = False
     requires_installation: bool = False
 
@@ -44,7 +45,7 @@ class BaseProcess:
             Any: A message or result of the process (string, rowid, etc.).
         """
         import sqlite3
-        if cls.TABLE_CLASS is not None:
+        if cls.data_structures is not None:
             conn = get_db_connection(db_path)
             cls.create_tables(conn)
             conn.close()
@@ -55,13 +56,14 @@ class BaseProcess:
     @classmethod
     def create_tables(cls, conn) -> None:
         """
-        Creates the table for this process if TABLE_CLASS is defined.
+        Creates the table for this process if any data structures are referenced.
         
         Args:
             conn (sqlite3.Connection): The SQLite connection.
         """
-        if cls.TABLE_CLASS is not None:
-            cls.TABLE_CLASS.create_table(conn)
+        if cls.data_structures is not None:
+            for table in cls.data_structures:
+                table.create_table(conn)
 
     @classmethod
     def install(cls) -> None:

@@ -26,7 +26,7 @@ class FilePreprocessing(BaseProcess):
     """
     Hashes a file and records it and its core metadata in the database.
     """
-    TABLE_CLASS = FileTable
+    data_structures = [FileTable]
     can_repeat: bool = True
 
     @classmethod
@@ -46,7 +46,7 @@ class FilePreprocessing(BaseProcess):
                 output_callback(f"Calculated MD5: {md5_hash}\n")
 
             existing = conn.execute(
-                f"SELECT * FROM {FileTable.TABLE_NAME} WHERE md5_hash = ?",
+                f"SELECT * FROM {cls.data_structures[0].TABLE_NAME} WHERE md5_hash = ?",
                 (md5_hash,)
             ).fetchone()
 
@@ -128,7 +128,7 @@ class FilePreprocessing(BaseProcess):
                 "date_modified": date_modified,
                 "import_timestamp": import_timestamp,
             }
-            new_rowid = FileTable.insert_record(conn, data)
+            new_rowid = cls.data_structures[0].insert_record(conn, data)
             conn.close()
 
             if output_callback:

@@ -305,12 +305,12 @@ class FileImport(QDialog):
                             "ExtractFileMetadataProcess already done, can't repeat -> disabled.\n"
                         )
 
-            # 4B) For ANY single-use process (can_repeat=False) that defines TABLE_CLASS,
+            # 4B) For ANY single-use process (can_repeat=False) that references a data structure.
             #     check if it has an entry for this file_id
             for i, proc in enumerate(self.process_list):
-                if proc.TABLE_CLASS and not proc.can_repeat:
+                if proc.data_structures and not proc.can_repeat:
                     # Generic table check
-                    table_name = proc.TABLE_CLASS.TABLE_NAME
+                    table_name = proc.data_structures[0].TABLE_NAME
                     done_row = conn.execute(
                         f"SELECT rowid FROM {table_name} WHERE file_id = ?",
                         (existing_rowid,)

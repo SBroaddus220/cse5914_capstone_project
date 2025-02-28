@@ -22,7 +22,7 @@ class StoreText(BaseProcess):
     It simply sets a flag or data once for each file rowid. If already set,
     it should not be repeated.
     """
-    TABLE_CLASS = StoredText
+    data_structures = [StoredText]
     can_repeat: bool = False
 
     @classmethod
@@ -43,7 +43,7 @@ class StoreText(BaseProcess):
 
             # Check if we already have a record
             existing = conn.execute(
-                f"SELECT rowid FROM {StoredText.TABLE_NAME} WHERE file_id = ?",
+                f"SELECT rowid FROM {cls.data_structures[0].TABLE_NAME} WHERE file_id = ?",
                 (row_id,)
             ).fetchone()
 
@@ -59,7 +59,7 @@ class StoreText(BaseProcess):
                 "file_id": row_id,
                 "some_data": "User-specific single-run data."
             }
-            StoredText.insert_record(conn, data)
+            cls.data_structures[0].insert_record(conn, data)
             conn.close()
 
             msg = f"Store text process completed for file_id={row_id}."

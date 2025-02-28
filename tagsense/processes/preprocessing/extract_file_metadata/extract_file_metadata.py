@@ -27,7 +27,7 @@ class ExtractFileMetadataProcess(BaseProcess):
     Currently implemented to handle images. Additional file type support
     can be added by extending the _extract_metadata_for_filetype method.
     """
-    TABLE_CLASS = FileMetadata
+    data_structures = [FileTable, FileMetadata]
     can_repeat: bool = False
 
     @classmethod
@@ -55,7 +55,7 @@ class ExtractFileMetadataProcess(BaseProcess):
             conn = get_db_connection(db_path)
 
             # Fetch the file record using row_id
-            file_record = FileTable.fetch_record(conn, row_id, "rowid")
+            file_record = cls.data_structures[0].fetch_record(conn, row_id, "rowid")
             if not file_record:
                 msg = "No matching file record found in database."
                 if output_callback:
@@ -73,7 +73,7 @@ class ExtractFileMetadataProcess(BaseProcess):
                 output_callback(f"Extracted metadata: {metadata_dict}\n")
 
             # Insert into file metadata table
-            FileMetadata.insert_record(conn, {
+            cls.data_structures[1].insert_record(conn, {
                 "file_id": file_id,
                 "metadata": json.dumps(metadata_dict)
             })
@@ -85,7 +85,7 @@ class ExtractFileMetadataProcess(BaseProcess):
             return msg
 
         except Exception as e:
-            err_msg = f"Error in ExtractFileMetadataProcess: {e}"
+            err_msg = f"Error in {cls.__name__}: {e}"
             logger.error(err_msg)
             if output_callback:
                 output_callback(err_msg + "\n")
@@ -108,7 +108,7 @@ class ExtractFileMetadataProcess(BaseProcess):
         """
         sql = f"""
         SELECT *
-        FROM {FileTable.TABLE_NAME}
+        FROM {cls.data_structures[0].TABLE_NAME}
         WHERE file_path = ?
         LIMIT 1
         """

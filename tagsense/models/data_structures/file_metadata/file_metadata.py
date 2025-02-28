@@ -9,6 +9,7 @@ import sqlite3
 import logging
 
 from tagsense.models.base_table import BaseTable
+from tagsense.models.data_structures.file_table.file_table import FileTable
 
 # **** LOGGING ****
 logger = logging.getLogger(__name__)
@@ -38,7 +39,8 @@ class FileMetadata(BaseTable):
         CREATE TABLE IF NOT EXISTS {cls.TABLE_NAME} (
             rowid INTEGER PRIMARY KEY,
             file_id INTEGER NOT NULL,
-            metadata TEXT NOT NULL
+            metadata TEXT NOT NULL,
+            FOREIGN KEY (file_id) REFERENCES {FileTable.TABLE_NAME}(rowid)
         )
         """
         conn.execute(sql)
