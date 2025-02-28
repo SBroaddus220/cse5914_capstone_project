@@ -5,17 +5,14 @@ Search that shows core metadata for all files.
 """
 
 # **** IMPORTS ****
-import re
 import logging
 logger = logging.getLogger(__name__)
 
-from PyQt6.QtCore import Qt, QEvent
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton
-from PyQt6.QtWidgets import QListWidget, QListWidgetItem, QMessageBox
-from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtCore import QObject
-
-
+from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtCore import Qt, QEvent
+from PyQt6.QtWidgets import QListWidget, QListWidgetItem, QMessageBox
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton
 
 from tagsense.searches.base_file_search import FileSearchBase
 
@@ -34,7 +31,7 @@ class _RowidSearchEventFilter(QObject):
 
     def __init__(
         self,
-        search: 'AllFilesSearch',
+        search: 'LeftSidebarSearch',
         edit: QLineEdit,
         recommendation_list: QListWidget,
         search_button: QPushButton
@@ -120,10 +117,7 @@ class _RowidSearchEventFilter(QObject):
         self._edit.setCursorPosition(len(new_text))
 
 
-
-
-
-class AllFilesSearch(FileSearchBase):
+class LeftSidebarSearch(FileSearchBase):
     """
     Search that selects from file_table with rowid-based searching.
     Includes multi-token logic, parentheses, negative tokens, 
@@ -390,12 +384,6 @@ class AllFilesSearch(FileSearchBase):
             for m in matching:
                 self.recommendation_list.addItem(QListWidgetItem(str(m)))
 
-
-class AllFileMetadataSearch(FileSearchBase):
-    """Concrete example that selects all data from file_core_metadata."""
-    
-    def get_sql(self) -> str:
-        return "SELECT * FROM file_core_metadata"
 
 # ****
 if __name__ == "__main__":

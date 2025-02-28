@@ -18,9 +18,10 @@ from PyQt6.QtWidgets import QAbstractItemView
 
 from tagsense.config import DB_PATH
 from tagsense.models.data_structures.file_table.file_table import FileTable
-from tagsense.searches.base_file_search import FileSearchBase
-from tagsense.searches.searches.all_files.all_files_search import AllFilesSearch, AllFileMetadataSearch
+from tagsense.searches.base_file_search import FileSearchBase, generate_search_classes
 from tagsense.views.data_view_window import DataViewWindow
+from tagsense.searches.searches.example01_even_rows.even_rows import EvenRows
+from tagsense.searches.searches.example02_left_sidebar_search.left_sidebar_search import LeftSidebarSearch
 
 from tagsense.views.dialog_windows.file_import import FileImport
 from tagsense.views.dialog_windows.run_processes import RunProcesses
@@ -87,7 +88,7 @@ class MainWindow(QMainWindow):
         self.main_splitter.addWidget(self.left_sidebar_vsplit)
 
         # Default search
-        self.current_search: FileSearchBase = AllFilesSearch()
+        self.current_search: FileSearchBase = LeftSidebarSearch()
         self.db_path: str = DB_PATH
 
         # Create the right side widget
@@ -103,10 +104,28 @@ class MainWindow(QMainWindow):
 
         # Dropdown + info button
         self.search_dropdown = QComboBox()
-        self.search_dropdown.addItem("All Files")
-        self.search_dropdown.setItemData(0, AllFilesSearch(), role=Qt.ItemDataRole.UserRole)
-        self.search_dropdown.addItem("All File Metadata")
-        self.search_dropdown.setItemData(1, AllFileMetadataSearch(), role=Qt.ItemDataRole.UserRole)
+
+        # First, add custom searches
+        custom_searches = [
+            ("Left Sidebar Search", LeftSidebarSearch()),
+            ("Even Rows", EvenRows()),
+        ]
+
+        for index, (formatted_name, search_instance) in enumerate(custom_searches):
+            self.search_dropdown.addItem(formatted_name)
+            self.search_dropdown.setItemData(index, search_instance, role=Qt.ItemDataRole.UserRole)
+
+        # Generate search classes dynamically for database tables
+        search_classes = generate_search_classes(self.db_path)
+
+        # Add auto-generated searches AFTER the custom ones
+        start_index = len(custom_searches)
+
+        for index, (table_name, search_instance) in enumerate(search_classes.items(), start=start_index):
+            formatted_name = f"All {table_name.replace('_', ' ').title()}"
+            self.search_dropdown.addItem(formatted_name)
+            self.search_dropdown.setItemData(index, search_instance, role=Qt.ItemDataRole.UserRole)
+
         self.search_dropdown.currentIndexChanged.connect(self.handle_search_dropdown_change)
 
         self.info_button = QPushButton("Info")

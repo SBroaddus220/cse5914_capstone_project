@@ -5,6 +5,7 @@ Base foundation for searches.
 """
 
 # **** IMPORTS ****
+import sqlite3
 from typing import Optional
 from abc import ABC, abstractmethod
 from PyQt6.QtWidgets import QWidget
@@ -55,6 +56,41 @@ class FileSearchBase(ABC):
             str: A message explaining how to use this search (if needed).
         """
         return "No additional help for this search."
+
+def generate_search_classes(db_path):
+    """
+    Dynamically generates search classes based on table names.
+    
+    Args:
+        db_path (str): Path to the SQLite database.
+    
+    Returns:
+        dict: A dictionary of {table_name: dynamically_created_class_instance}.
+    """
+    # Fetch table names from SQLite
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    search_classes = {}
+
+    for table_name in tables:
+        # Dynamically create a search class for each table
+        class_name = f"{table_name.capitalize()}Search"
+
+        # Define the class dynamically
+        search_class = type(
+            class_name,
+            (FileSearchBase,),
+            {"get_sql": lambda self, t=table_name: f"SELECT * FROM {t}"}
+        )
+
+        # Store an instance of the class
+        search_classes[table_name] = search_class()
+
+    return search_classes
 
 
 # ****
