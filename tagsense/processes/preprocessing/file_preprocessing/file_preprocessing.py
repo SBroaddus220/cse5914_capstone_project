@@ -13,6 +13,7 @@ import hashlib
 from typing import Any
 from datetime import datetime
 
+from tagsense.database import get_db_connection
 from tagsense.config import CLIENT_FILES_DIR
 from tagsense.processes.base_process import BaseProcess
 from tagsense.models.data_structures.file_table.file_table import FileTable
@@ -38,8 +39,7 @@ class FilePreprocessing(BaseProcess):
 
         try:
             # Use row_factory so we can reference columns by name
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
+            conn = get_db_connection(db_path)
 
             md5_hash = cls._calculate_md5(file_path)
             if output_callback:

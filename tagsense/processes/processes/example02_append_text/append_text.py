@@ -8,6 +8,7 @@ Example algorithm to append text data.
 import logging
 from typing import Any
 
+from tagsense.database import get_db_connection
 from tagsense.processes.base_process import BaseProcess
 from tagsense.models.data_structures.example02_appended_text.appended_text import AppendedText
 
@@ -39,8 +40,7 @@ class AppendText(BaseProcess):
             output_callback("Running append text process...\n")
 
         try:
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
+            conn = get_db_connection(db_path)
 
             # Check if we already have a record in append_text_process_records for this file
             existing = conn.execute(

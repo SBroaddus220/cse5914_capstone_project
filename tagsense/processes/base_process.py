@@ -8,6 +8,8 @@ Base foundation for processes.
 import logging
 from typing import Any
 
+from tagsense.database import get_db_connection
+
 # **** LOGGING ****
 logger = logging.getLogger(__name__)
 
@@ -43,7 +45,7 @@ class BaseProcess:
         """
         import sqlite3
         if cls.TABLE_CLASS is not None:
-            conn = sqlite3.connect(db_path)
+            conn = get_db_connection(db_path)
             cls.create_tables(conn)
             conn.close()
         if output_callback:

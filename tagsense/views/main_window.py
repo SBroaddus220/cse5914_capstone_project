@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QPixmap, QIcon, QAction
 from PyQt6.QtWidgets import QAbstractItemView
 
+from tagsense.database import get_db_connection
 from tagsense.config import DB_PATH
 from tagsense.models.data_structures.file_table.file_table import FileTable
 from tagsense.searches.base_file_search import FileSearchBase, generate_search_classes
@@ -380,7 +381,7 @@ class MainWindow(QMainWindow):
 
     def _fetch_file_path(self, rowid: str) -> str:
         """Fetches file_path from FileTable for the given rowid."""
-        conn = sqlite3.connect(self.db_path)
+        conn = get_db_connection(self.db_path)
         record = FileTable.fetch_record(conn, rowid, "rowid")
         conn.close()
         if record:

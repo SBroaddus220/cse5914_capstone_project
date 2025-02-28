@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 from tagsense import registry
+from tagsense.database import get_db_connection
 from tagsense.config import DB_PATH
 from tagsense.util import create_divider, discover_classes
 from tagsense.processes.base_process import BaseProcess
@@ -274,7 +275,7 @@ class FileImport(QDialog):
 
         # 4) Check if this MD5 already exists in DB
         db_path = DB_PATH
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection(db_path)
         row = conn.execute(
             f"SELECT rowid FROM {FileTable.TABLE_NAME} WHERE md5_hash = ?",
             (md5_hash,)

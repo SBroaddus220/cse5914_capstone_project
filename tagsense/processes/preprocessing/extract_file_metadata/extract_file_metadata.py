@@ -11,6 +11,7 @@ import sqlite3
 from PIL import Image, ExifTags
 from typing import Any, Dict, Optional
 
+from tagsense.database import get_db_connection
 from tagsense.processes.base_process import BaseProcess
 from tagsense.models.data_structures.file_table.file_table import FileTable
 from tagsense.models.data_structures.file_metadata.file_metadata import FileMetadata
@@ -51,7 +52,7 @@ class ExtractFileMetadataProcess(BaseProcess):
             output_callback("Extracting core metadata...\n")
 
         try:
-            conn = sqlite3.connect(db_path)
+            conn = get_db_connection(db_path)
 
             # Fetch the file record using row_id
             file_record = FileTable.fetch_record(conn, row_id, "rowid")

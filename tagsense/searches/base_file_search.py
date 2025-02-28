@@ -10,6 +10,8 @@ from typing import Optional
 from abc import ABC, abstractmethod
 from PyQt6.QtWidgets import QWidget
 
+from tagsense.database import get_db_connection
+
 # **** CLASS ****
 class FileSearchBase(ABC):
     """Abstract base class for SQL-based file searches."""
@@ -29,9 +31,7 @@ class FileSearchBase(ABC):
         Returns:
             list[dict]: List of rows as dictionaries.
         """
-        import sqlite3
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection(db_path)
         rows = conn.execute(self.get_sql()).fetchall()
         conn.close()
         return [dict(row) for row in rows]
@@ -68,7 +68,7 @@ def generate_search_classes(db_path):
         dict: A dictionary of {table_name: dynamically_created_class_instance}.
     """
     # Fetch table names from SQLite
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     tables = [row[0] for row in cursor.fetchall()]

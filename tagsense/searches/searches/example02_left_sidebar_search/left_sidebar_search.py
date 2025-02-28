@@ -14,6 +14,7 @@ from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtWidgets import QListWidget, QListWidgetItem, QMessageBox
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton
 
+from tagsense.database import get_db_connection
 from tagsense.searches.base_file_search import FileSearchBase
 
 # **** CLASS ****
@@ -327,7 +328,7 @@ class LeftSidebarSearch(FileSearchBase):
             return
 
         try:
-            conn = sqlite3.connect(db_path)
+            conn = get_db_connection(db_path)
             c = conn.cursor()
             c.execute("SELECT rowid FROM file_table ORDER BY rowid")
             rows = c.fetchall()

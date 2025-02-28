@@ -8,6 +8,7 @@ Example algorithm to store text data.
 import logging
 from typing import Any
 
+from tagsense.database import get_db_connection
 from tagsense.processes.base_process import BaseProcess
 from tagsense.models.data_structures.example01_stored_text.stored_text import StoredText
 
@@ -31,7 +32,6 @@ class StoreText(BaseProcess):
         'param' to be the file's rowid. If there's already an entry for
         that file_id, it won't create another.
         """
-        import sqlite3
         super().execute(db_path, param, output_callback)  # Ensures table creation
 
         row_id = int(param)
@@ -39,8 +39,7 @@ class StoreText(BaseProcess):
             output_callback("Running store text process...\n")
 
         try:
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
+            conn = get_db_connection(db_path)
 
             # Check if we already have a record
             existing = conn.execute(
