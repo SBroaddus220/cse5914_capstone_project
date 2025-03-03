@@ -9,11 +9,15 @@ import logging
 import sqlite3
 from typing import Any, Dict, List, Optional
 
+from db_audit_log import DBAuditLog
+
+
 # **** CLASS ****
 class BaseTable:
     """
     A base class to define standard CRUD operations for source tables.
     Subclasses can override these methods or extend them as needed.
+    Each INSERT, UPDATE, and DELETE operation is logged via DBAuditLog.
     """
 
     TABLE_NAME: str = ""  # Must be overridden in subclasses
@@ -45,15 +49,18 @@ class BaseTable:
         columns = ', '.join(data.keys())
         placeholders = ', '.join(['?'] * len(data))
         sql = f"INSERT INTO {cls.TABLE_NAME} ({columns}) VALUES ({placeholders})"
-        cursor = conn.execute(sql, list(data.values()))
+        conn.execute(sql, list(data.values()))
         conn.commit()
 
         # Attempt to determine the new record ID
         # If the table has an INTEGER PRIMARY KEY, fetch last inserted row ID
+        
+        # record_id = None --> is this right?
         row = conn.execute("SELECT last_insert_rowid()").fetchone()
         if row and row[0]:
             record_id = int(row[0])
 
+        cls._log_operation(conn, "INSERT", record_id, data)
         return record_id  # Return the new record ID
 
     @classmethod
@@ -66,15 +73,21 @@ class BaseTable:
         sql = f"UPDATE {cls.TABLE_NAME} SET {set_clause} WHERE {id_column} = ?"
         conn.execute(sql, list(data.values()) + [row_id])
         conn.commit()
+        
+        cls._log_operation(conn, "UPDATE", row_id, data)
 
     @classmethod
     def delete_record(cls, conn: sqlite3.Connection, row_id: int, id_column="rowid") -> None:
         """
         Delete a record from the table by row ID (or another ID column).
         """
+        
+        old_record = cls.fetch_record(conn, row_id, id_column) or {} # Is this right?
         sql = f"DELETE FROM {cls.TABLE_NAME} WHERE {id_column} = ?"
         conn.execute(sql, (row_id,))
         conn.commit()
+        
+        cls._log_operation(conn, "DELETE", row_id, old_record)
 
     @classmethod
     def fetch_record(cls, conn: sqlite3.Connection, row_id: int, id_column="rowid") -> Optional[Dict[str, Any]]:
@@ -108,6 +121,26 @@ class BaseTable:
         cursor = conn.execute(f"PRAGMA table_info({table_name});")
         actual_columns = {row[1] for row in cursor.fetchall()}
         return required_columns.issubset(actual_columns)
+    
+    @classmethod
+    def _log_operation(cls, conn: sqlite3.Connection, operation_type: str, record_id: Optional[Any], changes: Dict[str, Any]) -> None:
+        """
+        Internal helper to log every database operation using DBAuditLog.
+        
+        Args:
+            conn: The SQLite connection.
+            operation_type: The type of operation ("INSERT", "UPDATE", "DELETE").
+            record_id: The affected record ID.
+            changes: A dictionary containing the inserted/updated/deleted data.
+        """
+        
+        DBAuditLog.log_operation(
+            conn,
+            cls.TABLE_NAME,
+            operation_type,
+            str(record_id) if record_id is not None else None,
+            changes
+        )
 
 # ****
 if __name__ == "__main__":
