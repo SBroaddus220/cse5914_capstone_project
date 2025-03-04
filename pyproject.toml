@@ -19,6 +19,8 @@ pyqt6 = "^6.4.2"
 markdown = "^3.7"
 pillow = "^11.1.0"
 sqlparse = "^0.5.3"
+langchain-openai = "^0.3.7"
+langchain = "^0.3.19"
 
 [build-system]
 requires = ["poetry-core"]
