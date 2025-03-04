@@ -56,7 +56,6 @@ Spencer Hurt (https://github.com/spencer-hurt)
 Jerrin Wofford (https://github.com/jerrinw1110)
 Scott Caley (https://github.com/scottcaley)
 Grant McGeehen (https://github.com/gmcgeehen)
-Dengchen Mei # github?
 
 ## Contributing
 Due to this being a course project, no contributions are allowed probably.
