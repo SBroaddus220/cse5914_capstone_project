@@ -7,6 +7,7 @@ The data here can be edited, just be careful.
 
 # **** IMPORTS ****
 import logging
+from dotenv import load_dotenv
 from pathlib import Path
 
 # **** LOGGING ****
@@ -16,6 +17,9 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------------------------------
 # Should not be changed unless you know what you're doing
 # ------------------------------------------------------------------------------------------
+
+# **** DOTENV ****
+load_dotenv()
 
 # **** PATHS ****
 BASE_DIR = Path(__file__).resolve().parent.parent

@@ -1,11 +1,14 @@
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from typing import List
+import os
+
+
 
 
 chat = ChatOpenAI(
     model='deepseek-chat',
-    openai_api_key='sk-YMny5jgovdXTw8wqoRwB5N8YhkiESekpZpgEWOit9kx7mEV3',
+    openai_api_key= os.getenv("OPENAI_API_KEY"), 
     openai_api_base='https://tbnx.plus7.plus/v1',
     max_tokens=1024
 )

@@ -59,3 +59,19 @@ Grant McGeehen (https://github.com/gmcgeehen)
 
 ## Contributing
 Due to this being a course project, no contributions are allowed probably.
+
+## Natural Language Processing
+User enter the natural language to the bar and will be recognized and 
+then parse to the function called "process_natural_language" in controller.py
+when pressing the 'process' button. 
+
+And then this function will call another function called "get_tags_from_tags"
+in tag_generator.py, which invokes the deepseek_chat model to generate the 
+tags. There will be 3 tags generated: 1 most relevant combination of what the 
+user ask and 2 other related tags(words may not appear in the prompt). And then,
+it returns a list of three tags. The tags will be shown in the window.
+
+## PYTHON DOTENV
+We hide our sensitive parameters like our api keys in the ".env" file and we load these
+parameters in config.py file. When we need to use these parameters, we use
+"parameter = os.getenv("PARAMETER")" to get the value.
