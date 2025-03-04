@@ -11,7 +11,7 @@ from typing import Callable
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QSplitter, QVBoxLayout, QHBoxLayout, QStackedWidget, QComboBox, QPushButton, 
-    QTableWidget, QHeaderView, QTableWidgetItem, QListWidget, QListWidgetItem, QMessageBox
+    QTableWidget, QHeaderView, QTableWidgetItem, QListWidget, QListWidgetItem, QMessageBox, QLabel
 )
 from PyQt6.QtGui import QPixmap, QIcon, QAction
 from PyQt6.QtWidgets import QAbstractItemView
@@ -294,6 +294,9 @@ class MainWindow(QMainWindow):
         if not results:
             self.table_widget.setColumnCount(0)
             return
+        
+        for item in results:
+            item["preview"] = ""
 
         columns = list(results[0].keys())
         self.table_widget.setColumnCount(len(columns))
@@ -321,6 +324,7 @@ class MainWindow(QMainWindow):
 
             rowid = str(record.get("rowid", ""))
             file_path = self._fetch_file_path(rowid)
+            print(file_path)
             pixmap = QPixmap(file_path)
             thumbnail_item = QListWidgetItem(f"RowID: {rowid}")
             if pixmap.isNull():
@@ -331,6 +335,17 @@ class MainWindow(QMainWindow):
 
             thumbnail_item.setData(Qt.ItemDataRole.UserRole, rowid)
             self.thumbnail_list.addItem(thumbnail_item)
+
+            # Add image preview (if available) to table view
+            preview_label = QLabel()
+            pixmap = QPixmap(file_path)
+            scaled_pixmap = pixmap.scaledToHeight(self.table_widget.rowHeight(row_idx))
+            preview_label.setPixmap(scaled_pixmap)
+            preview_label.setScaledContents(False)  # Keeps aspect ratio without distortion
+            if scaled_pixmap.isNull():
+                preview_label.setText("No file preview")
+            self.table_widget.setCellWidget(row_idx, col_idx, preview_label)
+
 
     def handle_table_double_click(self, item: QTableWidgetItem) -> None:
         """Opens detail window when a user double-clicks a table cell."""
