@@ -27,6 +27,7 @@ from tagsense.processes.processes.file_preprocessing.file_preprocessing import F
 from tagsense.processes.processes.extract_file_metadata.extract_file_metadata import ExtractFileMetadataProcess
 from tagsense.processes.processes.example01_store_text.store_text import StoreText
 from tagsense.processes.processes.example02_append_text.append_text import AppendText
+from tagsense.processes.processes.yolo_detect_objects.detect_objects import DetectObjects
 
 
 # **** LOGGING ****
@@ -54,7 +55,8 @@ class FileImport(QDialog):
         self.user_processes = [
             # GrayscaleImageProcess(),
             AppendText(),
-            StoreText()
+            StoreText(),
+            DetectObjects()
         ]
 
         # Combine them for display; core first, then user
