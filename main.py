@@ -13,6 +13,8 @@ from PyQt6.QtWidgets import QApplication
 from tagsense import registry
 from tagsense.util import discover_classes
 from tagsense.processes.base_process import BaseProcess
+from tagsense.searches.base_file_search import FileSearchBase
+from tagsense.searches.base_file_search import generate_search_classes
 
 from tagsense.config import LOGGER_CONFIG, DB_PATH
 from tagsense.database import get_db_connection
@@ -52,19 +54,40 @@ def main() -> None:
 
     # ****
     # Register and install processes if no installation required
-    discover_classes(Path(__file__).parent / "tagsense" / "processes" / "processes", BaseProcess)
-    for process in registry.class_registry:
+    from tagsense.processes.preprocessing.extract_file_metadata.extract_file_metadata import ExtractFileMetadataProcess
+    from tagsense.processes.preprocessing.file_preprocessing.file_preprocessing import FilePreprocessing
+
+    registry.register_processes([ExtractFileMetadataProcess, FilePreprocessing])
+    registry.mark_process_as_installed(ExtractFileMetadataProcess)
+    registry.mark_process_as_installed(FilePreprocessing)
+    
+    
+    discovered_processes = discover_classes(Path(__file__).parent / "tagsense" / "processes" / "processes", BaseProcess)
+    for discovered_process in discovered_processes:
+        if discovered_process.requires_installation:
+            installed = registry.is_process_installed(discovered_process)
+            logger.info(f"⚠️ {discovered_process.__name__} requires installation. Installed: {installed}")
+        registry.register_processes([discovered_process])
+    for process in registry.process_registry:
         process: BaseProcess
         process_name = process.__name__ 
         if process.requires_installation:
             logger.info(f"Skipping installation of {process_name}")
             continue
-        if registry.is_installed(process):
+        if registry.is_process_installed(process):
             logger.info(f"{process_name} already installed")
             continue
         logger.info(f"Installing {process_name}...")
         process.install()
-        registry.mark_installed(process)
+        registry.mark_process_as_installed(process)
+
+    # Register all searches
+    generated_searches = generate_search_classes(DB_PATH)
+    for table_name, search_instance in generated_searches.items():
+        registry.register_searches([search_instance])
+    discovered_searches = discover_classes(Path(__file__).parent / "tagsense" / "searches" / "searches", FileSearchBase)
+    for discovered_search in discovered_searches:
+        registry.register_searches([discovered_search])
     
     # ****
     # Init GUI 

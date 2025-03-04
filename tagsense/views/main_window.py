@@ -336,9 +336,11 @@ class MainWindow(QMainWindow):
         """Opens detail window when a user double-clicks a table cell."""
         if self.rowid_col_idx is None:
             return
+        if self.current_search is None:
+            return
         row_idx = item.row()
         rowid = self.table_widget.item(row_idx, self.rowid_col_idx).text()
-        self.open_detail_window(rowid)
+        self.open_detail_window(rowid, self.current_search)
 
     def handle_thumbnail_double_click(self, item: QListWidgetItem) -> None:
         """Opens detail window when a user double-clicks a thumbnail item."""
@@ -371,12 +373,12 @@ class MainWindow(QMainWindow):
         """
         self.thumbnail_list.clear()
 
-    def open_detail_window(self, rowid: str) -> None:
+    def open_detail_window(self, rowid: str, current_search) -> None:
         """
         Opens a new, non-blocking window showing the image (if any) for the given rowid,
         preserving aspect ratio, and closing on double-click.
         """
-        window = DataViewWindow(self, rowid, self.db_path)
+        window = DataViewWindow(self, rowid, self.current_search, self.db_path)
         window.show()
 
     def _fetch_file_path(self, rowid: str) -> str:

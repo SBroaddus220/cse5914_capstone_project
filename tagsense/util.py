@@ -74,11 +74,7 @@ def discover_classes(directory: Path, base_class: Type) -> List:
                     logger.info(f"Discovered {obj.__name__}")
                     discovered_classes.append(obj)
 
-                    if obj.requires_installation:
-                        installed = registry.is_installed(obj)
-                        logger.info(f"⚠️ {obj.__name__} requires installation. Installed: {installed}")
-
-    registry.register_classes(discovered_classes)
+    return discovered_classes
 
 
 # ****
