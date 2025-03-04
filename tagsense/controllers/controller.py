@@ -1,5 +1,6 @@
 from typing import List
 from ..models.model import TagExplorerModel
+from ..natural_language_processing.tag_generater import get_tags_from_text
 
 class TagExplorerController:
     def __init__(self, model: TagExplorerModel) -> None:
@@ -19,3 +20,9 @@ class TagExplorerController:
 
     def fetch_natural_language_query(self) -> str:
         return self.model.get_natural_language_query()
+
+    def process_natural_language(self, query: str) -> List[str]:
+        tags = get_tags_from_text(query)
+        for tag in tags:
+            self.model.add_tag(tag)
+        return tags

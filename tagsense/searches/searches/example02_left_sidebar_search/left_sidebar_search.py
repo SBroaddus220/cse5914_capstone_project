@@ -16,7 +16,8 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushB
 
 from tagsense.database import get_db_connection
 from tagsense.searches.base_file_search import FileSearchBase
-
+from tagsense.controllers.controller import TagExplorerController
+from tagsense.models.model import TagExplorerModel
 # **** CLASS ****
 
 class _RowidSearchEventFilter(QObject):
@@ -35,7 +36,8 @@ class _RowidSearchEventFilter(QObject):
         search: 'LeftSidebarSearch',
         edit: QLineEdit,
         recommendation_list: QListWidget,
-        search_button: QPushButton
+        search_button: QPushButton,
+        
     ) -> None:
         super().__init__()
         self._search = search
@@ -130,6 +132,9 @@ class LeftSidebarSearch(FileSearchBase):
         self._sql_condition: str = ""
         self._all_rowids: list[int] = []
         self._event_filter: _RowidSearchEventFilter | None = None
+        self._model = TagExplorerModel()
+        self._controller = TagExplorerController(self._model) 
+        self.tags_display: list[str] = []
 
     def get_sql(self) -> str:
         if self._sql_condition:
@@ -144,9 +149,23 @@ class LeftSidebarSearch(FileSearchBase):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(10)
 
-        natural_language_input = QLineEdit()
-        natural_language_input.setPlaceholderText("Enter natural language query (no-op)...")
-        layout.addWidget(natural_language_input)
+        self.natural_language_input = QLineEdit()
+        self.natural_language_input.setPlaceholderText("Enter natural language query (no-op)...")
+        layout.addWidget(self.natural_language_input)
+        natural_input_process = QPushButton("Process")
+        layout.addWidget(natural_input_process)
+        self.tags_display = QListWidget()
+        layout.addWidget(self.tags_display)
+        
+        
+        def _perform_process() -> None:
+            query = self.natural_language_input.text().strip()
+            if query:
+                tags = self._controller.process_natural_language(query)
+                self.tags_display.clear()
+                self.tags_display.addItems(tags)
+
+        natural_input_process.clicked.connect(_perform_process)
 
         rowid_search_line = QHBoxLayout()
         self.rowid_search_input = QLineEdit()
