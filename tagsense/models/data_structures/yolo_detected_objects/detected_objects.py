@@ -28,7 +28,8 @@ class DetectedObjects(BaseTable):
             file_id INTEGER NOT NULL,
             class_label TEXT NOT NULL,
             confidence REAL NOT NULL,
-            bbox TEXT NOT NULL
+            bbox TEXT NOT NULL,
+            FOREIGN KEY (file_id) REFERENCES file_table(rowid)
         )
         """
         conn.execute(sql)

@@ -52,7 +52,7 @@ class DetectObjects(BaseProcess):
                 if output_callback:
                     output_callback(msg + "\n")
                 return msg
-
+            
             # Otherwise, create a new record
             cursor = conn.execute("SELECT file_path FROM file_table WHERE rowid = ?", (row_id,))
             file_row = cursor.fetchone()
@@ -61,11 +61,10 @@ class DetectObjects(BaseProcess):
             file_path = file_row["file_path"]
             model = YOLO("yolov8n.pt")
             results = model(file_path)
-
-            detections = []
+            
             for result in results:
                 for box in result.boxes.data:
-                    class_id, confidence, x1, y1, x2, y2 = box.tolist()
+                    x1, y1, x2, y2, confidence, class_id = box.tolist()
                     data = {
                         "file_id": row_id,
                         "class_label": model.names[int(class_id)],
@@ -73,7 +72,6 @@ class DetectObjects(BaseProcess):
                         "bbox": json.dumps([x1, y1, x2, y2])
                     }
                     DetectedObjects.insert_record(conn, data)
-                    detections.append(data)
             conn.close()
 
             msg = f"Detect objects process completed for file_id={row_id}."
