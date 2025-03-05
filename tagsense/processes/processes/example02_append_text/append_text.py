@@ -35,6 +35,10 @@ class AppendText(BaseProcess):
         import sqlite3
         super().execute(db_path, param, output_callback)  # Ensures table creation
 
+        #Original append as of now being just "append"
+        new_text = "Appended"
+        file_id = int(param)
+
         row_id = int(param)
         if output_callback:
             output_callback("Running append text process...\n")
@@ -48,11 +52,10 @@ class AppendText(BaseProcess):
                 (row_id,)
             ).fetchone()
 
-            new_text = "Appended some user data."
             if existing:
-                # If found, append new text
-                old_text = existing["appended_text"] or ""
-                updated_text = old_text + "\n" + new_text
+                # If found, append new text, make a comma between the appended text
+                existing_text = existing["appended_text"] if existing["appended_text"] else ""
+                updated_text = f"{existing_text}, {new_text}".strip()
 
                 cls.data_structures[0].update_record(
                     conn,
@@ -67,6 +70,7 @@ class AppendText(BaseProcess):
                 cls.data_structures[0].insert_record(conn, data)
                 msg = f"Created new append_text_process_records entry for file_id={row_id}."
 
+            conn.commit()
             conn.close()
             if output_callback:
                 output_callback(msg + "\n")
