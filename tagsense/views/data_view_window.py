@@ -9,7 +9,7 @@ import sqlite3
 import logging
 from typing import List, Dict, Any
 from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QPixmap, QIcon
+from PyQt6.QtGui import QPixmap, QIcon, QKeyEvent
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QLabel, QCheckBox, QStackedWidget,
     QPushButton, QTableWidget, QAbstractItemView, QTableWidgetItem, QListWidget, QListWidgetItem, QDialog, QHeaderView
@@ -35,7 +35,7 @@ class DataViewWindow(QMainWindow):
         db_path (str): Path to the SQLite database.
     """
 
-    def __init__(self, parent: QWidget, rowid: str, current_search: FileSearchBase, db_path: str) -> None:
+    def __init__(self, parent: QWidget, rowid: str, current_search: FileSearchBase, db_path: str, file_list) -> None:
         """
         Initializes the DataViewWindow with three sections: this datum, children, and parents.
         Also prepares the left sidebar for filtering by tables, searches, and processes.
@@ -46,12 +46,20 @@ class DataViewWindow(QMainWindow):
             current_search (FileSearchBase): The current active search instance.
             db_path (str): The path to the SQLite database.
         """
+
         super().__init__(parent)
-        logger.debug("Initializing DataViewWindow with rowid=%s", rowid)
 
         self._db_path = db_path
+        self._current_search = current_search
         self._rowid = rowid
-        conn = get_db_connection(db_path)
+        self._file_list = file_list
+
+        self.loadFileDetails()
+        
+
+    def loadFileDetails(self):
+        logger.debug("Initializing DataViewWindow with rowid=%s", self._rowid)
+        conn = get_db_connection(self._db_path)
 
         # Gather parent-child relationships
         logger.debug("Gathering parent-child rows")
@@ -61,7 +69,7 @@ class DataViewWindow(QMainWindow):
             related_queries.append(search_instance.get_sql())
         self._parent_child_rows = find_parent_child_rows(
             conn,
-            current_search.get_sql(),
+            self._current_search.get_sql(),
             self._rowid,
             related_queries
         )
@@ -74,8 +82,8 @@ class DataViewWindow(QMainWindow):
             if search_instance.get_sql() in self._parent_child_rows.get("matched_queries", []):
                 self._related_searches.append(search_instance)
         # Ensure current_search is in the list
-        if current_search not in self._related_searches:
-            self._related_searches.append(current_search)
+        if self._current_search not in self._related_searches:
+            self._related_searches.append(self._current_search)
 
         # Identify processes
         logger.debug("Identifying related processes")
@@ -88,7 +96,7 @@ class DataViewWindow(QMainWindow):
                         break
 
         # Main Window Setup
-        self.setWindowTitle(f"Details for rowid = {rowid}")
+        self.setWindowTitle(f"Details for rowid = {self._rowid}")
         self.showMaximized()
 
         self._main_widget = QWidget()
@@ -120,9 +128,28 @@ class DataViewWindow(QMainWindow):
         # Keys will be (section_type, search_name, table_name)
         self._section_widgets = {}
 
-        self._populate_center_view(current_search)
+        self._populate_center_view(self._current_search)
         self._main_layout.addWidget(self._left_scroll_area, 1)
         self._main_layout.addWidget(self._center_scroll_area, 3)
+
+    def keyPressEvent(self, event: QKeyEvent):
+        """Handles left and right arrow key presses for navigation."""
+        if event.key() == Qt.Key.Key_Right:
+            self.next_file()
+        elif event.key() == Qt.Key.Key_Left:
+            self.prev_file()
+
+    def next_file(self):
+        """Moves to the next file."""
+        if int(self._rowid) < len(self._file_list):
+            self._rowid = str(int(self._rowid)+1)
+            self.loadFileDetails()
+
+    def prev_file(self):
+        """Moves to the previous file."""
+        if int(self._rowid) > 1:
+            self._rowid = str(int(self._rowid)-1)
+            self.loadFileDetails()
 
     def _populate_left_sidebar(self) -> None:
         """
@@ -263,18 +290,6 @@ class DataViewWindow(QMainWindow):
                 show_widget = False
 
             widget.setVisible(show_widget)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     def _populate_center_view(self, current_search: FileSearchBase) -> None:

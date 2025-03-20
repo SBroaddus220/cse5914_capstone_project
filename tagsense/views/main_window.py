@@ -393,8 +393,12 @@ class MainWindow(QMainWindow):
         Opens a new, non-blocking window showing the image (if any) for the given rowid,
         preserving aspect ratio, and closing on double-click.
         """
-        window = DataViewWindow(self, rowid, self.current_search, self.db_path)
+
+        file_list = self.current_search.fetch_results(self.db_path)
+
+        window = DataViewWindow(self, rowid, self.current_search, self.db_path, file_list)
         window.show()
+
 
     def _fetch_file_path(self, rowid: str) -> str:
         """Fetches file_path from FileTable for the given rowid."""
