@@ -242,11 +242,12 @@ class DataViewWindow(QMainWindow):
             
             # Check if the output data structure contains a reference to the current record
             output_data_structure = process.output
-            child = dict(output_data_structure.read_by_input_key(
+            child = output_data_structure.read_by_input_key(
                 current_search.data_structure.fetch_entry_key_from_entry(self.record)
-            ))
+            )
             if not child:
                 continue
+            child = dict(child)
 
             # Check if child record already exists
             child_entry_key = output_data_structure.fetch_entry_key_from_entry(child)
