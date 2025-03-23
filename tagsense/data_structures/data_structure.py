@@ -10,7 +10,7 @@ import json
 import hashlib
 import jsonschema
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 # **** CLASS ****
 class DataStructure:
@@ -184,9 +184,9 @@ class DataStructure:
         return cls._storage.pop(key["data"], None) is not None
 
     @classmethod
-    def list_all(cls) -> Dict[str, Any]:
+    def list_all(cls) -> List[Dict[str, Any]]:
         """List all stored data unless an external database is in use."""
-        return cls._storage
+        return list(cls._storage.values())
 
     @classmethod
     def fetch_all_entry_keys(cls) -> list:

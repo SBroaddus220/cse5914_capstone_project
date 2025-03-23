@@ -8,7 +8,7 @@ View module for the main window of the application.
 import re
 import sqlite3
 import logging
-from typing import List, Union
+from typing import List, Union, Tuple
 
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import (
@@ -50,7 +50,6 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         logger.info("Initializing main window")
         self.conn = conn
-        self.current_search: AppSearch
 
         # ****
         # Initialize menus
@@ -63,12 +62,12 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.main_splitter)
         
         # **
-        # Init left sidebar
-        self.init_left_sidebar()
-        
-        # **
         # Init central data view
         self.init_central_data_view()
+
+        # **
+        # Init left sidebar
+        self.init_left_sidebar()
         
         self.setWindowTitle("DoomFile9000")
         self.setMinimumSize(800, 600)
@@ -125,8 +124,6 @@ class MainWindow(QMainWindow):
         )
         self.main_splitter.addWidget(self.data_view)
         
-        
-        
     def init_left_sidebar(self, parent: QWidget = None) -> None:
         # ****
         # Create initial widget
@@ -135,7 +132,8 @@ class MainWindow(QMainWindow):
         left_sidebar_layout.setContentsMargins(5, 5, 5, 5)
         left_sidebar_layout.setSpacing(10)
         self.left_sidebar_container.setLayout(left_sidebar_layout)
-        self.main_splitter.addWidget(self.left_sidebar_container)
+        # Add widget to first position of splitter
+        self.main_splitter.insertWidget(0, self.left_sidebar_container)
         
         # **
         # Create the natural language input
@@ -192,7 +190,7 @@ class MainWindow(QMainWindow):
         )
         self.explicit_data_search_input.installEventFilter(self._event_filter)
         
-        self._cache_all_explicit_data_items()
+        self._cache_all_explicit_data_items(self.data_view.current_search)
         self._update_suggestions("")  # Initial suggestions
         
     def get_row_data(table_widget: QTableWidget, row_idx: int) -> dict[str, str]:
@@ -211,9 +209,10 @@ class MainWindow(QMainWindow):
                 for col in range(table_widget.columnCount())]
         return dict(zip(headers, values))
 
-    def _cache_all_explicit_data_items(self) -> None:
+    def _cache_all_explicit_data_items(self, search: AppSearch) -> None:
         """Cache all explicit data items for suggestions."""
-        self.all_items = ["101", "102", "203", "305"]  # Placeholder 
+        self.all_items = search.generate_all_possible_tags()
+        self._update_suggestions("")
         
     def _handle_natural_language_input_generate(self, query: str) -> None:
         print(f"Generating tags for query: {query}")
@@ -234,8 +233,14 @@ class MainWindow(QMainWindow):
         logger.debug(f"Expanded expression => {expanded_expr}")
         parsed_expr = parse_logical_expression(expanded_expr)
         logger.debug(f"Parsed expression => {parsed_expr}")
-        # self.populate_file_views()  # TODO
-        print(f"Search triggered with expression: {parsed_expr}")
+        tag_whitelist, tag_blacklist = parsed_expr
+        entry_whitelist, entry_blacklist = self.data_view.current_search.generate_entry_filters_by_tags(tag_whitelist, tag_blacklist)
+        self.data_view.entry_whitelist = entry_whitelist
+        self.data_view.entry_blacklist = entry_blacklist
+        self.data_view.populate_data_view()
+        
+    def _handle_search_dropdown_change(self, current_search: AppSearch) -> None:
+        self._cache_all_explicit_data_items(current_search)
         
     def _autocomplete_last_token(self, item: QListWidgetItem) -> None:
         """Autocomplete the last token in the current text with the selected string."""
@@ -413,152 +418,102 @@ def autocomplete_last_token(current_text: str, sel_str: str) -> str:
     return new_text
 
 def expand_parentheses(expr: str) -> str:
-    """Expands parentheses in an expression by distributing negations and flattening enclosed terms.
+    """Expands parentheses and distributes negation properly across tokens.
 
-    This function processes an expression containing parentheses and expands them by distributing
-    negations (`-`) when present. If parentheses enclose multiple space-separated tokens, they are
-    extracted and placed back into the expression without parentheses. If a negation precedes the 
-    parentheses, it is applied to each enclosed token individually.
-
-    Args:
-        expr (str): The input expression containing potential parentheses to be expanded.
-
-    Returns:
-        str: The expression with parentheses expanded and negations properly distributed.
-
-    Example:
-        ```python
-        expand_parentheses("-(a b c)")
-        # Returns: "-a -b -c"
-
-        expand_parentheses("(x y)")
-        # Returns: "x y"
-
-        expand_parentheses("(-z w)")
-        # Returns: "-z w"
-        ```
-    """
-    text = expr
-    pattern = re.compile(r'(?P<neg>-?)\(\s*(?P<body>[^)]+)\s*\)')
-    
-    while True:
-        match = pattern.search(text)
-        if not match:
-            break
-        is_negative = match.group('neg')
-        contents = match.group('body')
-        tokens = contents.strip().split()
-        
-        if not tokens:
-            replacement = ""
-        else:
-            if is_negative == '-':
-                replacement = " ".join(f"-{t}" for t in tokens)
-            else:
-                replacement = " ".join(tokens)
-        
-        start, end = match.span()
-        text = text[:start] + replacement + text[end:]
-    
-    return text
-        
-def parse_logical_expression(expr: str) -> str:
-    """Parses a logical expression by handling AND and OR conditions.
-
-    This function processes an input expression by splitting it into logical 
-    groups. It separates conditions joined by `or`, ensuring each group is 
-    properly enclosed in parentheses when necessary. If no `or` conditions exist, 
-    it processes the expression using `parse_and_conditions`, which handles space-separated 
-    AND conditions.
+    This function identifies groups enclosed in parentheses and flattens them
+    into individual tokens, correctly applying any negation prefix (`-`) only
+    to non-logical keywords (e.g., "and", "or"). Double negations cancel out.
 
     Args:
-        expr (str): The input logical expression.
+        expr (str): The expression string containing parentheses and optional negations.
 
     Returns:
-        str: The formatted logical expression with `AND` and `OR` conditions structured properly.
+        str: The flattened expression with negations distributed and parentheses removed.
 
     Examples:
-        ```python
-        parse_logical_expression("a b c")
-        # Returns: "a AND b AND c"
+        >>> expand_parentheses("-(a b c)")
+        '-a -b -c'
 
-        parse_logical_expression("a b or c d")
-        # Returns: "(a AND b) OR (c AND d)"
+        >>> expand_parentheses("(x y)")
+        'x y'
 
-        parse_logical_expression("")
-        # Returns: ""
+        >>> expand_parentheses("(-z w)")
+        '-z w'
 
-        parse_logical_expression("x or y or z")
-        # Returns: "(x) OR (y) OR (z)"
-
-        parse_logical_expression("apple -banana orange or -grape pear")
-        # Returns: "(apple AND NOT banana AND orange) OR (NOT grape AND pear)"
-        ```
+        >>> expand_parentheses("-(101 or -102)")
+        '-101 or 102'
     """
-    def parse_and_conditions(tokens: str) -> str:
-        """Parses space-separated tokens into an AND-based logical expression.
+    pattern = re.compile(r'(?P<neg>-?)\(\s*(?P<body>[^)]+)\s*\)')
+    while True:
+        match = pattern.search(expr)
+        if not match:
+            break
+        is_negative = (match.group('neg') == '-')
+        contents = match.group('body')
+        tokens = contents.strip().split()
 
-        This function processes space-separated tokens and converts them into 
-        an AND-based logical condition. It supports negation using `-` as a prefix, 
-        meaning a token prefixed with `-` will be treated as an exclusion (`!=`), 
-        while all other tokens are treated as inclusion (`=`).
-
-        Args:
-            tokens (str): A string containing space-separated tokens.
-
-        Returns:
-            str: A logical expression combining tokens with `AND` conditions.
-                Returns an empty string if no valid conditions are found.
-
-        Examples:
-            ```python
-            parse_and_conditions("apple banana cherry")
-            # Returns: "apple AND banana AND cherry"
-
-            parse_and_conditions("-dog cat -mouse")
-            # Returns: "NOT dog AND cat AND NOT mouse"
-
-            parse_and_conditions("123 -456 789")
-            # Returns: "123 AND NOT 456 AND 789"
-
-            parse_and_conditions("")
-            # Returns: ""
-            ```
-
-        Note:
-            - Tokens prefixed with `-` are treated as exclusions (`NOT token`).
-            - All other tokens are treated as inclusions (`token`).
-            - No special field name is required; it works generically on any text input.
-        """
-        parts = tokens.split()
-        conditions = []
-
-        for token in parts:
-            if token.startswith('-'):
-                value = token[1:].strip()
-                conditions.append(f"NOT {value}")
+        expanded_tokens = []
+        for t in tokens:
+            if t.lower() in ('and', 'or'):
+                expanded_tokens.append(t)
+            elif is_negative:
+                expanded_tokens.append(t[1:] if t.startswith('-') else f'-{t}')
             else:
-                conditions.append(token)
+                expanded_tokens.append(t)
+        replacement = " ".join(expanded_tokens)
+        start, end = match.span()
+        expr = expr[:start] + replacement + expr[end:]
+    return expr
 
-        if not conditions:
-            return ""
 
-        return " AND ".join(conditions) if len(conditions) > 1 else conditions[0]
-    
-    if not expr:
-        return ""
+def parse_logical_expression(expr: str) -> Tuple[List[str], List[str]]:
+    """Parses a logical expression into whitelist and blacklist tags.
 
-    or_parts = [p.strip() for p in expr.split(" or ")]
+    This function processes logical expressions containing tags, negations,
+    and logical operators. It normalizes the input by expanding parentheses
+    and splitting on recognized logical operators (AND, OR) and whitespace.
+    Tags prefixed with '-' are added to the blacklist; others to the whitelist.
+    If a tag appears in both, it is removed from both lists.
 
-    if len(or_parts) > 1:
-        conditions = []
-        for part in or_parts:
-            sub_cond = parse_and_conditions(part)
-            if sub_cond:
-                conditions.append(f"({sub_cond})")
-        return " OR ".join(conditions)
-    else:
-        return parse_and_conditions(expr)
+    Args:
+        expr (str): The logical expression to parse.
+
+    Returns:
+        Tuple[List[str], List[str]]: A tuple containing two lists:
+            - whitelist: Tags to include (without '-')
+            - blacklist: Tags to exclude (without '-')
+
+    Examples:
+        >>> parse_logical_expression("apple -banana orange")
+        (['apple', 'orange'], ['banana'])
+
+        >>> parse_logical_expression("apple OR -banana")
+        (['apple'], ['banana'])
+
+        >>> parse_logical_expression("-(101 or -102)")
+        ([], ['101', '102'])
+
+        >>> parse_logical_expression("101 -101")
+        ([], [])
+    """
+    expr = expand_parentheses(expr)
+    tokens = re.split(r'(?i)\b(?:and|or)\b|\s+', expr)
+    tokens = [t.strip() for t in tokens if t.strip()]
+
+    whitelist, blacklist = set(), set()
+
+    for token in tokens:
+        if token.startswith('-'):
+            blacklist.add(token[1:])
+        else:
+            whitelist.add(token)
+
+    # Remove any overlap
+    overlap = whitelist & blacklist
+    whitelist -= overlap
+    blacklist -= overlap
+
+    return list(whitelist), list(blacklist)
 
 def get_suggestions(typed_str: str, all_items: List[Union[str, int]]) -> List[str]:
     """Returns a list of suggestions based on the typed input string.

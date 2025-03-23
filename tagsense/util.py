@@ -15,7 +15,7 @@ from collections import deque
 from typing import List, Type, Optional, Any, Dict, Tuple
 
 from PyQt6.QtWidgets import QTableWidget
-
+from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QComboBox, QPushButton,
     QTableWidget, QStackedWidget, QListWidget, QTableWidgetItem, QLabel,
@@ -41,6 +41,8 @@ logger = logging.getLogger(__name__)
 
 # **** CLASSES ****
 class CustomGridTableWidget(QWidget):
+    search_dropdown_changed: pyqtSignal = pyqtSignal(object)
+    
     def __init__(
         self, 
         searches: list, 
@@ -49,6 +51,15 @@ class CustomGridTableWidget(QWidget):
         entry_whitelist: Optional[list] = None, 
         entry_blacklist: Optional[list] = None
         ):
+        """Initializes the CustomGridTableWidget.
+
+        Args:
+            searches (list): List of searches to display.
+            parent (QWidget, optional): Parent for widget. Defaults to None.
+            window_class (_type_, optional): Window to open upon item select. Defaults to None.
+            entry_whitelist (Optional[list], optional): Entry whitelist for every search in widget. Defaults to None.
+            entry_blacklist (Optional[list], optional): Entry blacklist for every search in widget. Defaults to None.
+        """
         super().__init__(parent)
         self.searches = searches
         self.window_class = window_class
@@ -147,19 +158,7 @@ class CustomGridTableWidget(QWidget):
 
         # ****
         # Fetch results
-        results = self.current_search.fetch_results()
-
-        # ****
-        # Filter entries
-        filtered_results = []
-        for result in results:
-            result_entry_key = self.current_search.data_structure.fetch_entry_key_from_entry(result)
-            if self.entry_blacklist and result_entry_key in self.entry_blacklist:
-                continue
-            if self.entry_whitelist and result_entry_key not in self.entry_whitelist:
-                continue
-            filtered_results.append(result)
-        results = filtered_results
+        results = self.current_search.fetch_results(self.entry_whitelist, self.entry_blacklist)
         
         # ****
         # Check if there are any results
@@ -241,6 +240,8 @@ class CustomGridTableWidget(QWidget):
         index = self.search_dropdown.currentIndex()
         self.current_search = self.search_dropdown.itemData(index, Qt.ItemDataRole.UserRole)
         self.populate_data_view()
+        # Emit signal to update other widgets
+        self.search_dropdown_changed.emit(self.current_search)
         
     def show_search_info(self) -> None:
         """Displays the help text of the current search in a QMessageBox."""
