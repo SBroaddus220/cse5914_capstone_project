@@ -5,14 +5,11 @@ Dialog window for running processes.
 """
 
 # **** IMPORTS ****
-import time
 import logging
-from typing import List, Optional, Dict, Any
-from PyQt6.QtCore import Qt, QTimer
+from typing import List
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QDialog, QHBoxLayout, QVBoxLayout, QSplitter, QGroupBox, QWidget, QCheckBox,
-    QLabel, QLineEdit, QPlainTextEdit, QPushButton, QMessageBox, QScrollArea,
-    QScrollBar
+    QDialog, QVBoxLayout, QWidget, QLabel, 
 )
 from PyQt6.QtWidgets import QListWidgetItem
 from PyQt6.QtWidgets import QTableWidgetItem
@@ -20,10 +17,8 @@ from PyQt6.QtWidgets import QComboBox
 from PyQt6.QtWidgets import QAbstractItemView
 
 from tagsense import registry
-from tagsense.config import DB_PATH
-from tagsense.util import create_divider
 from tagsense.data_structures.data_structure import DataStructure
-from tagsense.util import CustomGridTableWidget, RunProcessesWidget
+from tagsense.widgets import CustomGridTableWidget, RunProcessesWidget
 
 # **** LOGGER ****
 # Sets up logger

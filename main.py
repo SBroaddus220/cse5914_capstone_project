@@ -13,14 +13,12 @@ from PyQt6.QtWidgets import QApplication
 from tagsense import registry
 from tagsense.util import discover_classes
 from tagsense.searches.app_search import AppSearch
-from tagsense.model import TagExplorerModel
 from tagsense.database import get_db_connection
 from tagsense.views.main_window import MainWindow
 from tagsense.config import LOGGER_CONFIG, DB_PATH
 from tagsense.processes.app_process import AppProcess
 from tagsense.data_structures.app_data_structure import AppDataStructure
 from tagsense.searches.app_search import generate_search_classes
-from tagsense.controllers.controller import TagExplorerController
 from tagsense.data_structures.manual_data_structure import ManualDataStructure
 
 # **** LOGGING ****
@@ -91,8 +89,6 @@ def main() -> None:
         # ****
         # Init GUI 
         app = QApplication(sys.argv)
-        model = TagExplorerModel()
-        controller = TagExplorerController(model)
 
         app.setApplicationName("TagSense")
         app.setApplicationDisplayName("TagSense")

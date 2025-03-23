@@ -5,17 +5,13 @@ Dialog window for importing files.
 """
 
 # **** IMPORTS ****
-import os
-import json
-import time
 import logging
-import hashlib
 import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Set, Optional
 from collections import deque
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QVBoxLayout, QSplitter, QGroupBox, QWidget, QCheckBox,
     QLabel, QLineEdit, QPlainTextEdit, QPushButton, QFileDialog, QMessageBox,
@@ -23,10 +19,9 @@ from PyQt6.QtWidgets import (
 )
 
 from tagsense import registry
-from tagsense.util import create_divider, RunProcessesWidget, sort_processes
-from tagsense.data_structures.app_data_structure import AppDataStructure
+from tagsense.widgets import RunProcessesWidget
+from tagsense.util import sort_processes
 from tagsense.data_structures.manual_data_structure import ManualDataStructure
-from tagsense.processes.app_process import AppProcess
 from tagsense.processes.process import Process
 
 from tagsense.processes.processes.file_system_integration.file_system_integration import FileSystemIntegration

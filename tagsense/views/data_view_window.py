@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import QSplitter, QSizePolicy
 from tagsense import registry
 from tagsense.searches.search import Search
 from tagsense.processes.process import Process
-from tagsense.util import CustomGridTableWidget
+from tagsense.widgets import CustomGridTableWidget
 from tagsense.data_structures.data_structure import DataStructure
 from tagsense.data_structures.manual_data_structure import ManualDataStructure
 

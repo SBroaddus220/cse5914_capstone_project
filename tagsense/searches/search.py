@@ -81,10 +81,6 @@ class Search:
         raise NotImplementedError("Subclasses must implement this method.")
     
     @classmethod
-    def handle_explicit_query(cls, query: str) -> list[dict]:
-        raise NotImplementedError("Subclasses must implement this method.")
-    
-    @classmethod
     def generate_thumbnail(cls, result: dict, thumbnail_size=(100,100)) -> PILImage:
         return Image.new("RGB", size=thumbnail_size, color=(200,200,200))
         

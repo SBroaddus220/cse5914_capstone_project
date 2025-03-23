@@ -5,6 +5,7 @@ View module for the main window of the application.
 """
 
 # **** IMPORTS ****
+import os
 import re
 import sqlite3
 import logging
@@ -21,9 +22,10 @@ from PyQt6.QtGui import QAction, QKeyEvent
 
 # **** LOCAL IMPORTS ****
 from tagsense import registry
-from tagsense.util import CustomGridTableWidget
+from tagsense.widgets import CustomGridTableWidget
 from tagsense.registry import search_registry
 from tagsense.searches.app_search import AppSearch
+from tagsense.natural_language_processing.natural_language_generator import OpenAINaturalLanguageGenerator
 
 # Import dialog windows
 from tagsense.views.dialog_windows.help import Help
@@ -214,11 +216,22 @@ class MainWindow(QMainWindow):
         self.all_items = search.generate_all_possible_tags()
         self._update_suggestions("")
         
-    def _handle_natural_language_input_generate(self, query: str) -> None:
-        print(f"Generating tags for query: {query}")
+    def _handle_natural_language_input_generate(self) -> None:
+        query = self.natural_language_input.text()
+        logger.info(f"Generating tags for query: {query}")
+        tags = self._generate_tags_from_text(query)
+        self.natural_language_tags.clear()
+        self.natural_language_tags.addItems(tags)
         
-    def _handle_natural_language_input_process(self, query: str) -> None:
-        print(f"Processing query: {query}")
+    def _handle_natural_language_input_process(self) -> None:
+        query = self.natural_language_input.text()
+        logger.info(f"Processing query: {query}")
+        self._update_by_explicit_data_search(query)
+
+    def _generate_tags_from_text(self, text: str) -> List[str]:
+        generator = OpenAINaturalLanguageGenerator(os.getenv("OPENAI_API_KEY"))
+        tags = generator.generate_tags_from_text(text)
+        return tags
 
     def _handle_explicit_data_recommendation_item_double_click(self, item: QListWidgetItem) -> None:
         """Double click to autocomplete."""
@@ -228,16 +241,23 @@ class MainWindow(QMainWindow):
     def _handle_explicit_data_search(self) -> None:
         """Handle the explicit data search."""
         typed_expr = self.explicit_data_search_input.text().strip()
-        logger.debug(f"Handling explicit data search: {typed_expr}")
-        expanded_expr = expand_parentheses(typed_expr)
+        self._update_by_explicit_data_search(typed_expr)
+        
+    def _update_by_explicit_data_search(self, query: str) -> None:
+        """Parse and update the data view based on the explicit data search."""
+        # Parse the query
+        logger.debug(f"Handling explicit data search: {query}")
+        expanded_expr = expand_parentheses(query)
         logger.debug(f"Expanded expression => {expanded_expr}")
         parsed_expr = parse_logical_expression(expanded_expr)
         logger.debug(f"Parsed expression => {parsed_expr}")
+        # Generate entry filters
         tag_whitelist, tag_blacklist = parsed_expr
         entry_whitelist, entry_blacklist = self.data_view.current_search.generate_entry_filters_by_tags(tag_whitelist, tag_blacklist)
         self.data_view.entry_whitelist = entry_whitelist
         self.data_view.entry_blacklist = entry_blacklist
-        self.data_view.populate_data_view()
+        # Update the data view
+        self.data_view.populate_data_view() 
         
     def _handle_search_dropdown_change(self, current_search: AppSearch) -> None:
         self._cache_all_explicit_data_items(current_search)
@@ -270,6 +290,10 @@ class MainWindow(QMainWindow):
                 tag1 tag2
                 ```
                 Search for posts that contain both `tag1` and `tag2`.
+                ```
+                tag1 and tag2
+                ```
+                Same as above.
                 ```
                 tag1 or tag2
                 ```

@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 )
 
 from tagsense import registry
-from tagsense.util import RunProcessesWidget
+from tagsense.widgets import RunProcessesWidget
 
 # **** LOGGING ****
 logger = logging.getLogger(__name__)
