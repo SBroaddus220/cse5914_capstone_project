@@ -8,497 +8,446 @@ View module for viewing a specific piece of data.
 import sqlite3
 import logging
 from typing import List, Dict, Any
-from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QPixmap, QIcon
+from PIL import ImageQt
+
+from PyQt6.QtCore import QSize, Qt, QEvent
+
+from PyQt6.QtGui import QPixmap, QIcon, QKeyEvent
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QLabel, QCheckBox, QStackedWidget,
     QPushButton, QTableWidget, QAbstractItemView, QTableWidgetItem, QListWidget, QListWidgetItem, QDialog, QHeaderView
 )
+from PyQt6.QtWidgets import QSplitter, QSizePolicy
 
 from tagsense import registry
-from tagsense.processes.base_process import BaseProcess
-from tagsense.database import find_parent_child_rows, get_db_connection, get_foreign_keys_from_sql, extract_table_names
-from tagsense.searches.base_file_search import FileSearchBase
+from tagsense.searches.search import Search
+from tagsense.processes.process import Process
+from tagsense.util import CustomGridTableWidget
+from tagsense.data_structures.data_structure import DataStructure
+from tagsense.data_structures.manual_data_structure import ManualDataStructure
 
 # **** LOGGING ****
 logger = logging.getLogger(__name__)
 
 # **** CLASSES ****
 class DataViewWindow(QMainWindow):
-    """Window that displays three horizontal sections: left sidebar, center data (with grid/table switch),
-    and right sidebar (thumbnail, related files, parents, children, siblings each with table/grid switch).
-    Includes logic for process-based filtering.
+    """Window for viewing individual data records."""
+    
+    def __init__(self, current_search: Search, record_idx: int, parent=None) -> None:
+        super().__init__(parent=parent)
+        logger.info("Initializing data view window...")
 
-    Args:
-        parent (QWidget): Parent widget.
-        rowid (str): The 'rowid' of the record to display.
-        db_path (str): Path to the SQLite database.
-    """
-
-    def __init__(self, parent: QWidget, rowid: str, current_search: FileSearchBase, db_path: str) -> None:
-        """
-        Initializes the DataViewWindow with three sections: this datum, children, and parents.
-        Also prepares the left sidebar for filtering by tables, searches, and processes.
-
-        Args:
-            parent (QWidget): The parent widget.
-            rowid (str): The rowid of the record to display.
-            current_search (FileSearchBase): The current active search instance.
-            db_path (str): The path to the SQLite database.
-        """
-        super().__init__(parent)
-        logger.debug("Initializing DataViewWindow with rowid=%s", rowid)
-
-        self._db_path = db_path
-        self._rowid = rowid
-        conn = get_db_connection(db_path)
-
-        # Gather parent-child relationships
-        logger.debug("Gathering parent-child rows")
-        related_queries = []
-        for search in registry.search_registry:
-            search_instance = search if isinstance(search, FileSearchBase) else search()
-            related_queries.append(search_instance.get_sql())
-        self._parent_child_rows = find_parent_child_rows(
-            conn,
-            current_search.get_sql(),
-            self._rowid,
-            related_queries
-        )
-
-        # Identify searches
-        logger.debug("Identifying related searches")
-        self._related_searches = []
-        for search in registry.search_registry:
-            search_instance = search if isinstance(search, FileSearchBase) else search()
-            if search_instance.get_sql() in self._parent_child_rows.get("matched_queries", []):
-                self._related_searches.append(search_instance)
-        # Ensure current_search is in the list
-        if current_search not in self._related_searches:
-            self._related_searches.append(current_search)
-
-        # Identify processes
-        logger.debug("Identifying related processes")
-        self._related_processes = []
-        for process in registry.installed_processes:
-            if process not in self._related_processes:
-                for data_structure in process.data_structures:
-                    if data_structure.TABLE_NAME in self._parent_child_rows.get("matched_tables", []):
-                        self._related_processes.append(process)
-                        break
-
-        # Main Window Setup
-        self.setWindowTitle(f"Details for rowid = {rowid}")
+        # Store attributes
+        self.current_search = current_search
+        self.record_idx = record_idx
+        self.record = current_search.fetch_results()[record_idx]
+        
+        # ****
+        # Initialize the UI
+        self.init_ui()
+        self.update_with_record(self.current_search, self.record_idx)
+        
+    def init_ui(self):
+        # ****
+        # Main window setup
+        self.setWindowTitle("Data Viewer")
         self.showMaximized()
-
-        self._main_widget = QWidget()
-        self._main_layout = QHBoxLayout(self._main_widget)
+        
+        self._main_widget = QSplitter(Qt.Orientation.Horizontal)
         self.setCentralWidget(self._main_widget)
-
-        # Left Sidebar
-        self._left_sidebar_widget = QWidget()
+        
+        # ****
+        # Left sidebar
+        self._left_sidebar_widget = FocusableWidget()
         self._left_sidebar_layout = QVBoxLayout(self._left_sidebar_widget)
-        self._populate_left_sidebar()
         self._left_scroll_area = QScrollArea()
+
+        def resize_scroll_area_event(event):
+            width = self._left_scroll_area.viewport().width()
+            self._left_sidebar_widget.setFixedWidth(width)
+            QScrollArea.resizeEvent(self._left_scroll_area, event)
+
+        self._left_scroll_area.resizeEvent = resize_scroll_area_event
         self._left_scroll_area.setWidgetResizable(True)
         self._left_scroll_area.setWidget(self._left_sidebar_widget)
 
-        # Center Container
-        logger.debug("Setting up center container with this datum, children, and parents")
-        self._center_container = QWidget()
-        self._center_container_layout = QVBoxLayout(self._center_container)
+        # ****
+        # Center container
+        self._center_splitter = QSplitter(Qt.Orientation.Vertical)
         self._center_scroll_area = QScrollArea()
         self._center_scroll_area.setWidgetResizable(True)
-        self._center_scroll_area.setWidget(self._center_container)
+        self._center_scroll_area.setWidget(self._center_splitter)
+        
+        self._main_widget.addWidget(self._left_scroll_area)
+        self._main_widget.addWidget(self._center_scroll_area)
+        
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        # Handle left/right arrow key presses for navigating records
+        logger.debug(f"Key pressed: {event.key()}")
+        if event.key() == Qt.Key.Key_Left:
+            self.prev_record()
+        elif event.key() == Qt.Key.Key_Right:
+            self.next_record()
+        else:
+            super().keyPressEvent(event)
+    
+    def prev_record(self) -> None:
+        """Moves to the previous record."""
+        if self.record_idx > 0:
+            self.record_idx -= 1
+            self.update_with_record(self.current_search, self.record_idx)
+    
+    def next_record(self) -> None:
+        """Moves to the next record."""
+        if self.record_idx < len(self.current_search.fetch_results()) - 1:
+            self.record_idx += 1
+            self.update_with_record(self.current_search, self.record_idx)
 
-        # For filtering
-        self._selected_tables = set()
-        self._selected_searches = set()
-        self._selected_processes = set()
-
-        # Track widgets for filtering
-        # Keys will be (section_type, search_name, table_name)
-        self._section_widgets = {}
-
-        self._populate_center_view(current_search)
-        self._main_layout.addWidget(self._left_scroll_area, 1)
-        self._main_layout.addWidget(self._center_scroll_area, 3)
-
+    def _reset_left_sidebar(self):
+        # Remove and delete all items/widgets in the layout
+        while self._left_sidebar_layout.count():
+            item = self._left_sidebar_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+            else:
+                # If it’s not a widget, it could be a sub-layout
+                sub_layout = item.layout()
+                if sub_layout is not None:
+                    # Recursively clear sub-layout
+                    while sub_layout.count():
+                        sub_item = sub_layout.takeAt(0)
+                        sub_widget = sub_item.widget()
+                        if sub_widget is not None:
+                            sub_widget.deleteLater()
+        
     def _populate_left_sidebar(self) -> None:
-        """
-        Populates the left sidebar with referencing tables, searches, and process checkboxes.
-        By default, all relevant items are checked so they appear in the center view.
-        """
-        logger.debug("Populating left sidebar")
-        table_list = self._parent_child_rows["matched_tables"]
+        logger.debug("Resetting left sidebar...")
+        self._reset_left_sidebar()
+        logger.debug("Populating left sidebar...")
+        
+        # ****
+        # Add thumbnail
+        thumbnail = self.current_search.generate_thumbnail(self.record)
+        pixmap = QPixmap.fromImage(ImageQt.ImageQt(thumbnail))
 
-        # Tables
-        self._left_sidebar_layout.addWidget(QLabel("Tables:"))
-        self._table_checkboxes = []
-        for tname in table_list:
-            cb = QCheckBox(tname)
-            cb.setChecked(True)
-            cb.stateChanged.connect(self._on_table_checkbox_toggled)
-            self._left_sidebar_layout.addWidget(cb)
-            self._table_checkboxes.append(cb)
+        # Create label
+        thumbnail_label = QLabel()
+        thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        thumbnail_label.setScaledContents(False)  # We'll scale manually to preserve aspect ratio
+        thumbnail_label.original_pixmap = pixmap  # Save original pixmap
 
-        # Searches
-        self._left_sidebar_layout.addWidget(QLabel("Searches:"))
+        # Override resize event using a subclass or lambda
+        def resize_event(event):
+            container_width = thumbnail_label.width()
+            original_pixmap = thumbnail_label.original_pixmap
+            scaled_pixmap = original_pixmap.scaledToWidth(container_width, Qt.TransformationMode.SmoothTransformation)
+            thumbnail_label.setPixmap(scaled_pixmap)
+
+        # Dynamically bind the resizeEvent
+        thumbnail_label.resizeEvent = resize_event
+
+        # Add to layout
+        self._left_sidebar_layout.addWidget(thumbnail_label)
+        
+        # ****
+        # Populate searches
+        self._searches = set()
         self._search_checkboxes = []
-        # Map each search's get_sql() -> class name for reverse lookup
-        self._search_sql_to_name = {}
-        for search in self._related_searches:
-            name = search.__class__.__name__
-            sql = search.get_sql()
-            self._search_sql_to_name[sql] = name
-
-        # Use the class name as the checkbox label
-        # (each is checked by default)
-        for sql, name in self._search_sql_to_name.items():
-            cb = QCheckBox(name)
-            cb.setChecked(True)
-            cb.stateChanged.connect(self._on_search_checkbox_toggled)
-            self._left_sidebar_layout.addWidget(cb)
-            self._search_checkboxes.append(cb)
-
-        # Processes
-        self._left_sidebar_layout.addWidget(QLabel("Processes:"))
+        
+        # Current search
+        self._searches.add(self.current_search)
+        
+        # Related searches
+        for relation, data in self.related_data.items():
+            for search in data["searches"]:
+                self._searches.add(search)
+        
+        self._left_sidebar_layout.addWidget(QLabel("Searches:"))
+        for search in self._searches:
+            search: Search
+            checkbox = QCheckBox(search.name)
+            checkbox.setChecked(True)
+            checkbox.stateChanged.connect(self._on_search_checkbox_toggled)
+            self._left_sidebar_layout.addWidget(checkbox)
+            self._search_checkboxes.append(checkbox)
+            
+        # ****
+        # Populate Data Structures
+        self._data_structures = set()
+        self._data_structure_checkboxes = []
+        for search in self._searches:
+            self._data_structures.add(search.data_structure)
+            
+        self._left_sidebar_layout.addWidget(QLabel("Data Structures:"))
+        for data_structure in self._data_structures:
+            data_structure: DataStructure
+            checkbox = QCheckBox(data_structure.uid)
+            checkbox.setChecked(True)
+            checkbox.stateChanged.connect(self._on_data_structure_checkbox_toggled)
+            self._left_sidebar_layout.addWidget(checkbox)
+            self._data_structure_checkboxes.append(checkbox)
+            
+        # ****
+        # Populate Processes
+        self._processes = set()
         self._process_checkboxes = []
-        for proc in self._related_processes:
-            cb = QCheckBox(proc.__name__)
-            cb.setChecked(True)
-            cb.stateChanged.connect(self._on_process_checkbox_toggled)
-            self._left_sidebar_layout.addWidget(cb)
-            self._process_checkboxes.append(cb)
-
+        for relation, data in self.related_data.items():
+            self._processes.add(data["process"])
+        
+        self._left_sidebar_layout.addWidget(QLabel("Processes:"))
+        for process in self._processes:
+            process: Process
+            checkbox = QCheckBox(process.uid)
+            checkbox.setChecked(True)
+            checkbox.stateChanged.connect(self._on_process_checkbox_toggled)
+            self._left_sidebar_layout.addWidget(checkbox)
+            self._process_checkboxes.append(checkbox)
+            
         self._left_sidebar_layout.addStretch()
 
-    def _on_table_checkbox_toggled(self, state: int) -> None:
-        """
-        Handler for toggling table checkboxes. Updates the set of selected tables and applies filters.
+    def update_with_record(self, current_search: Search, record_idx: int) -> None:
+        """Updates the window with a new record and search."""
+        self.current_search = current_search
+        self.record_idx = record_idx
+        self.record = current_search.fetch_results()[record_idx]
+        
+        # ****
+        # Find parent & child records
 
-        Args:
-            state (int): The checkbox state (checked/unchecked).
-        """
-        logger.debug("Table checkbox toggled")
-        self._selected_tables.clear()
-        # Re-collect any that remain checked
-        for cb in self._table_checkboxes:
-            if cb.isChecked():
-                self._selected_tables.add(cb.text())
-        self._apply_filters()
+        # For every search, for every record, we need to record the related processes and data structures for sorting purposes
+        self.parent_data: list[dict] = {}
+        self.children_data: list[dict] = {}
 
+        # e.g.
+        # [
+        #     (DataStructure, record_key_01): {
+        #         "searches": {search_01, search_02},
+        #         "process": process,
+        #     }
+        # ]
 
+        # Flip search registry to be a dictionary of data structures to searches
+        data_structure_to_searches = {}
+        for search in registry.search_registry:
+            if search.data_structure not in data_structure_to_searches:
+                data_structure_to_searches[search.data_structure] = set()
+            data_structure_to_searches[search.data_structure].add(search)
+
+        # Find children
+        for process in registry.installed_processes:
+            # Filter any process that can't have the current record as input
+            if not process.input == current_search.data_structure:
+                continue
+            
+            # Check if the output data structure contains a reference to the current record
+            output_data_structure = process.output
+            child = dict(output_data_structure.read_by_input_key(
+                current_search.data_structure.fetch_entry_key_from_entry(self.record)
+            ))
+            if not child:
+                continue
+
+            # Check if child record already exists
+            child_entry_key = output_data_structure.fetch_entry_key_from_entry(child)
+            if (output_data_structure, child_entry_key) in self.children_data:
+                raise ValueError("Child record already exists. Should not happen.")
+
+            # Add child record
+            self.children_data[(output_data_structure, child_entry_key)] = {
+                "searches": data_structure_to_searches[output_data_structure],
+                "process": process,
+            }
+
+        # Find parent
+        parent_data_structure = registry.fetch_data_structure_by_uid(
+            current_search.data_structure.fetch_input_data_structure_uid_from_entry(self.record)
+        )
+        if parent_data_structure and not parent_data_structure.uid == ManualDataStructure.uid:
+            self.parent_data[
+                (
+                    parent_data_structure,
+                    current_search.data_structure.fetch_input_data_key_from_entry(self.record)
+                )
+                ] = {
+                    "searches": data_structure_to_searches[parent_data_structure],
+                    "process": registry.fetch_process_by_uid(
+                        current_search.data_structure.fetch_process_uid_from_entry(self.record),
+                    )
+                }
+            
+        # Create combined dictionary for sorting
+        self.related_data = {**self.parent_data, **self.children_data}
+
+        # ****
+        self._populate_left_sidebar()
+        self._populate_center_container()
+        
     def _on_search_checkbox_toggled(self, state: int) -> None:
-        """
-        Handler for toggling search checkboxes. Updates the set of selected searches and applies filters.
-
-        Args:
-            state (int): The checkbox state (checked/unchecked).
-        """
-        logger.debug("Search checkbox toggled")
-        self._selected_searches.clear()
-        for cb in self._search_checkboxes:
-            if cb.isChecked():
-                self._selected_searches.add(cb.text())
-        self._apply_filters()
-
-
+        logger.debug("Search checkbox toggled.")
+        self._populate_center_container()
+        
+    def _on_data_structure_checkbox_toggled(self, state: int) -> None:
+        logger.debug("Data structure checkbox toggled.")
+        self._populate_center_container()
+        
     def _on_process_checkbox_toggled(self, state: int) -> None:
+        logger.debug("Process checkbox toggled.")
+        self._populate_center_container()
+        
+    def update_center_container(self, filtered_parents, filtered_children, current_search) -> None:
         """
-        Handler for toggling process checkboxes. Updates the set of selected processes and applies filters.
+        Updates the center container with filtered parent and child data along with the current search.
 
         Args:
-            state (int): The checkbox state (checked/unchecked).
+            filtered_parents (dict): Filtered parent data in the format {parent_key: {"searches": set}}.
+            filtered_children (dict): Filtered child data in the format {child_key: {"searches": set}}.
+            current_search (str): The current search to display.
         """
-        logger.debug("Process checkbox toggled")
-        self._selected_processes.clear()
-        for cb in self._process_checkboxes:
-            if cb.isChecked():
-                self._selected_processes.add(cb.text())
-        self._apply_filters()
+        logger.debug("Updating center container...")
 
-
-
-    def _filter_center_tables_by_processes(self) -> None:
-        """Enable/disable table widgets based on selected processes and table checkboxes."""
-        for cb in self._table_checkboxes:
-            tname = cb.text()
-            widget_info = self._table_widgets.get(tname)
-            if not widget_info:
-                continue
-            table_processes, widget = widget_info
-            if not cb.isChecked():
-                widget.setVisible(False)
-                continue
-            if not self._selected_processes:
-                widget.setVisible(True)
-            else:
-                if self._selected_processes.intersection(table_processes):
-                    widget.setVisible(True)
-                else:
-                    widget.setVisible(False)
-
-    def _apply_filters(self) -> None:
-        """
-        Applies filters based on selected tables, searches, and processes to hide/show the widgets
-        in the children/parents sections.
-        """
-        logger.debug("Applying filters to children/parents sections")
-        # If no processes are selected, that constraint is ignored (everything is shown for processes).
-        for (section_type, search_name, table_name), (widget, proc_set) in self._section_widgets.items():
-            show_widget = True
-
-            # Filter by table
-            if table_name not in self._selected_tables:
-                show_widget = False
-
-            # Filter by search
-            if search_name not in self._selected_searches:
-                show_widget = False
-
-            # Filter by process
-            # If we have selected processes, require intersection
-            if self._selected_processes and not (self._selected_processes.intersection(proc_set)):
-                show_widget = False
-
-            widget.setVisible(show_widget)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def _populate_center_view(self, current_search: FileSearchBase) -> None:
-        """
-        Populates the center area with three sections:
-        1) This datum (table-only view).
-        2) Children (each search can toggle between table/grid).
-        3) Parents (each search can toggle between table/grid).
-        """
-        logger.debug("Populating center view sections")
-
-        # -- THIS DATUM SECTION --
-        this_datum_container = QWidget()
-        this_datum_layout = QVBoxLayout(this_datum_container)
-        lbl_this_datum = QLabel("This Datum (Table View Only)")
-        lbl_this_datum.setStyleSheet("font-weight: bold;")
-        this_datum_layout.addWidget(lbl_this_datum)
-
-        # Fetch single record
-        try:
-            table_for_current_search = extract_table_names(current_search.get_sql())[0]
-            conn = get_db_connection(self._db_path)
-            cur = conn.cursor()
-            sql = f"SELECT * FROM {str(table_for_current_search)} WHERE rowid=?"
-            cur.execute(sql, (self._rowid,))
-            row = cur.fetchone()
-            if row:
-                columns = [desc[0] for desc in cur.description]
-                records = [dict(zip(columns, row))]
-            else:
-                records = []
-            conn.close()
-        except Exception as exc:
-            logger.exception("Failed to fetch this datum record: %s", exc)
-            records = []
-
-        this_datum_table = self._create_single_table_view(records)
-        this_datum_layout.addWidget(this_datum_table)
-        self._center_container_layout.addWidget(this_datum_container)
-
-        # -- CHILDREN SECTION --
-        if "children" in self._parent_child_rows:
-            children_container = QWidget()
-            children_layout = QVBoxLayout(children_container)
-            lbl_children = QLabel("Children")
-            lbl_children.setStyleSheet("font-weight: bold;")
-            children_layout.addWidget(lbl_children)
-
-            for child_query, child_info in self._parent_child_rows["children"].items():
-                matched_table = child_info.get("matched_table", "")
-                matched_rows = child_info.get("matched_rows", [])
-                # Attempt to map this child's SQL to the search class name
-                # (fall back to raw query string if not found)
-                search_name = self._search_sql_to_name.get(child_query, child_query)
-                widget = self._create_table_and_grid_view(
-                    search_name,
-                    matched_table,
-                    matched_rows,
-                    section_type="children"
+        # Clear existing widgets from the layout
+        while self._center_splitter.count():
+            widget = self._center_splitter.widget(0)
+            self._center_splitter.widget(0).setParent(None)
+            widget.deleteLater()
+                
+        # ****
+        # Filter records based on checkboxes
+        valid_data_structures = set()
+        valid_searches = set()
+        valid_processes = set()
+        
+        for checkbox in self._data_structure_checkboxes:
+            if checkbox.isChecked():
+                valid_data_structures.add(
+                    registry.fetch_data_structure_by_uid(checkbox.text())
                 )
-                children_layout.addWidget(widget)
-
-            self._center_container_layout.addWidget(children_container)
-
-        # -- PARENTS SECTION --
-        if "parents" in self._parent_child_rows:
-            parents_container = QWidget()
-            parents_layout = QVBoxLayout(parents_container)
-            lbl_parents = QLabel("Parents")
-            lbl_parents.setStyleSheet("font-weight: bold;")
-            parents_layout.addWidget(lbl_parents)
-
-            for parent_query, parent_info in self._parent_child_rows["parents"].items():
-                matched_table = parent_info.get("matched_table", "")
-                matched_rows = parent_info.get("matched_rows", [])
-                search_name = self._search_sql_to_name.get(parent_query, parent_query)
-                widget = self._create_table_and_grid_view(
-                    search_name,
-                    matched_table,
-                    matched_rows,
-                    section_type="parents"
+        
+        for checkbox in self._search_checkboxes:
+            if checkbox.isChecked():
+                valid_searches.add(
+                    registry.fetch_search_by_name(checkbox.text())
                 )
-                parents_layout.addWidget(widget)
 
-            self._center_container_layout.addWidget(parents_container)
+        for checkbox in self._process_checkboxes:
+            if checkbox.isChecked():
+                valid_processes.add(
+                    registry.fetch_process_by_uid(checkbox.text())
+                )
+                
+        filtered_parents = self.filter_records(filtered_parents, valid_data_structures, valid_searches, valid_processes)
+        filtered_children = self.filter_records(filtered_children, valid_data_structures, valid_searches, valid_processes)
+        parent_entry_keys = [key for _, key in filtered_parents.keys()]
+        child_entry_keys = [key for _, key in filtered_children.keys()]
 
-        self._center_container_layout.addStretch()
+        # ****
+        # Populate current search section
+        current_search_widget = CustomGridTableWidget(
+            [current_search], 
+            parent=self, 
+            window_class=self.__class__,
+            entry_whitelist=self.current_search.data_structure.fetch_entry_key_from_entry(self.record)
+            )
+        self._center_splitter.addWidget(current_search_widget)
 
+        # ****
+        # Populate parent section
+        parent_widget_container = QWidget()
+        parent_widget_container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        parent_widget_container_layout = QVBoxLayout(parent_widget_container)
 
+        if parent_entry_keys:
+            parents_label = QLabel("Parents:")
+            parent_widget_container_layout.addWidget(parents_label)
+        if filtered_parents:
+            for (parent_ds, parent_entry_key), data in filtered_parents.items():
+                parent_widget = CustomGridTableWidget(
+                    list(data["searches"]),
+                    parent=self,
+                    window_class=self.__class__,
+                    entry_whitelist=parent_entry_keys
+                )
+                parent_widget_container_layout.addWidget(parent_widget)
 
+        self._center_splitter.addWidget(parent_widget_container)
 
+        # ****
+        # Populate children section
+        children_widget_container = QWidget()
+        children_widget_container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        children_widget_container_layout = QVBoxLayout(children_widget_container)
 
+        if child_entry_keys:
+            children_label = QLabel("Children:")
+            children_widget_container_layout.addWidget(children_label)
+        for (child_ds, child_entry_key), data in filtered_children.items():
+            child_widget = CustomGridTableWidget(
+                list(data["searches"]),
+                parent=self,
+                window_class=self.__class__,
+                entry_whitelist=child_entry_keys
+            )
+            children_widget_container_layout.addWidget(child_widget)
 
+        self._center_splitter.addWidget(children_widget_container)
+            
+    def _populate_center_container(self) -> None:
+        logger.debug("Populating center container...")
+        self.update_center_container(self.parent_data, self.children_data, self.current_search)
 
-    def _create_single_table_view(self, records: List[Dict[str, Any]]) -> QTableWidget:
+    def filter_records(self, records, valid_data_structures, valid_searches, valid_processes):
         """
-        Creates a QTableWidget displaying a single record (or empty if no records).
+        Filters records based on valid data structures, searches, and processes.
 
         Args:
-            records (List[Dict[str, Any]]): The records to display (expected to contain one).
+            records (list): A list of records to filter following the format of `self.related_data`.
+            valid_data_structures (set): A set of allowed data structures.
+            valid_searches (set): A set of allowed searches.
+            valid_processes (set): A set of allowed processes.
 
         Returns:
-            QTableWidget: The table widget populated with the single record.
+            dict: A dictionary of filtered records.
         """
-        logger.debug("Creating single-table view for 'this datum'")
-        table_widget = QTableWidget()
-        table_widget.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        if not records:
-            return table_widget
+        filtered_records = {}
 
-        columns = list(records[0].keys())
-        table_widget.setColumnCount(len(columns))
-        table_widget.setHorizontalHeaderLabels(columns)
-        table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        for (data_structure, record_key), record_data in records.items():
+            # Check if the data structure is valid
+            if data_structure not in valid_data_structures:
+                continue
 
-        for idx, rec in enumerate(records):
-            table_widget.insertRow(idx)
-            for col_idx, col_key in enumerate(columns):
-                cell_value = str(rec.get(col_key, ""))
-                table_widget.setItem(idx, col_idx, QTableWidgetItem(cell_value))
+            # Check if any of the searches are valid
+            if not record_data["searches"].intersection(valid_searches):
+                continue
 
-        return table_widget
+            # Check if the process is valid
+            if record_data["process"] not in valid_processes:
+                continue
 
+            # If all conditions are met, keep the record
+            filtered_records[(data_structure, record_key)] = record_data
 
-    def _create_table_and_grid_view(
-        self,
-        search_name: str,
-        table_name: str,
-        row_dicts: List[sqlite3.Row],
-        section_type: str
-    ) -> QWidget:
-        """
-        Creates a container with a label, two buttons to switch between table and grid,
-        and a QStackedWidget that holds both a table widget and a grid widget for the given row_dicts.
+        return filtered_records
 
-        Args:
-            search_name (str): The name or identifier for the search.
-            table_name (str): The name of the table referenced.
-            row_dicts (List[sqlite3.Row]): The list of row objects.
-            section_type (str): One of 'children' or 'parents' (used for filtering).
+class FocusableWidget(QWidget):
+    """A widget that can receive focus."""
+    
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent=parent)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-        Returns:
-            QWidget: A container widget with table/grid switching.
-        """
-        logger.debug("Creating table/grid view for search=%s, table=%s, section=%s", search_name, table_name, section_type)
-        container = QWidget()
-        layout = QVBoxLayout(container)
-
-        # Title Label
-        lbl_title = QLabel(f"{search_name} - {table_name}")
-        lbl_title.setStyleSheet("font-weight: bold;")
-        layout.addWidget(lbl_title)
-
-        # Buttons for switching
-        btn_layout = QHBoxLayout()
-        table_btn = QPushButton("Table View")
-        grid_btn = QPushButton("Grid View")
-        btn_layout.addWidget(table_btn)
-        btn_layout.addWidget(grid_btn)
-        btn_layout.addStretch()
-        layout.addLayout(btn_layout)
-
-        # Stacked Widget
-        stack = QStackedWidget()
-        table_widget = QTableWidget()
-        table_widget.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        grid_widget = QListWidget()
-        grid_widget.setViewMode(QListWidget.ViewMode.IconMode)
-        grid_widget.setFlow(QListWidget.Flow.LeftToRight)
-        grid_widget.setResizeMode(QListWidget.ResizeMode.Adjust)
-        grid_widget.setIconSize(QSize(64, 64))
-
-        # Convert row objects to dict
-        records = []
-        if row_dicts:
-            cols = row_dicts[0].keys()
-            for r in row_dicts:
-                records.append({c: r[c] for c in cols})
-
-        if records:
-            columns = list(records[0].keys())
-            table_widget.setColumnCount(len(columns))
-            table_widget.setHorizontalHeaderLabels(columns)
-            table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-
-            for row_idx, rec in enumerate(records):
-                table_widget.insertRow(row_idx)
-                for col_idx, col_key in enumerate(columns):
-                    cell_value = str(rec.get(col_key, ""))
-                    table_widget.setItem(row_idx, col_idx, QTableWidgetItem(cell_value))
-
-                # Grid entry
-                # TODO: logic to get image icon from row
-                item = QListWidgetItem()
-                item.setText(str(rec))
-                grid_widget.addItem(item)
-
-        stack.addWidget(table_widget)
-        stack.addWidget(grid_widget)
-        layout.addWidget(stack)
-
-        def switch_to_table() -> None:
-            stack.setCurrentIndex(0)
-
-        def switch_to_grid() -> None:
-            stack.setCurrentIndex(1)
-
-        table_btn.clicked.connect(switch_to_table)
-        grid_btn.clicked.connect(switch_to_grid)
-
-        # Determine which processes reference this table
-        processes_for_table = set()
-        for proc in self._related_processes:
-            for ds in proc.data_structures:  # Ensure correct matching by TABLE_NAME
-                if getattr(ds, "TABLE_NAME", "") == table_name:
-                    processes_for_table.add(proc.__name__)
-                    break
-
-        # Register widget for later filtering
-        key = (section_type, search_name, table_name)
-        self._section_widgets[key] = (container, processes_for_table)
-
-        return container
-
+    def mousePressEvent(self, event):
+        """Focus widget when empty space is clicked."""
+        logger.debug("Focusable widget clicked.")
+        self.setFocus()
+        super().mousePressEvent(event)
+        
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        if window := self.window():
+            logger.debug(f"Forwarding key press to parent window: {window} with event: {event}")
+            window.keyPressEvent(event)
+        else:
+            super().keyPressEvent(event)
 
 # ****
 if __name__ == "__main__":

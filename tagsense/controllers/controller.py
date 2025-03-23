@@ -1,5 +1,5 @@
 from typing import List
-from ..models.model import TagExplorerModel
+from ..model import TagExplorerModel
 from ..natural_language_processing.tag_generater import get_tags_from_text
 
 class TagExplorerController:

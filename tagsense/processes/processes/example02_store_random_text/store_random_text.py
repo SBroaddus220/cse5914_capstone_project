@@ -1,53 +1,48 @@
 # -*- coding: utf-8 -*-
 
 """
-Example algorithm to store text data.
+Example algorithm to append text data.
 """
 
 # **** IMPORTS ****
+import os
 import sqlite3
 import logging
-from typing import Tuple, Optional
+from typing import Any, Tuple, Optional
 
 from tagsense.processes.app_process import AppProcess
 from tagsense.data_structures.app_data_structure import AppDataStructure
-from tagsense.data_structures.data_structures.example01_stored_text.stored_text import StoredText
+from tagsense.data_structures.data_structures.example02_stored_random_text.stored_random_text import StoredRandomText
 from tagsense.data_structures.data_structures.file_table.file_table import Files
+
 
 # **** LOGGING ****
 logger = logging.getLogger(__name__)
 
 # **** CLASSES ****
-class StoreText(AppProcess):
+class StoreRandomText(AppProcess):
     """
-    An example user-created process that is NOT repeatable for any given input.
+    An example repeatable user-created process that IS repeatable for any given input.
+    Repeated processes must be non-deterministic regarding solely the input data.
+    In this case, the stored text is dependent on some randomly generated data.
     """
-    name: str = "store_text"
+    name: str = "StoreRandomText"
     input: AppDataStructure = Files
-    output: AppDataStructure = StoredText
+    output: AppDataStructure = StoredRandomText
+    deterministic: bool = False
 
     @classmethod
     def execute(cls, input_data_key: str, output_callback=None) -> Tuple[str, Optional[dict]]:
         """
-        Stores a single run entry.
+        Appends text to an existing record or creates a new record.
         """
         if output_callback:
-            output_callback(f"Running {cls.name}...\n")
-
+            output_callback("Running append text process...\n")
+            
         # ****
-        # Check if the process has already been run
-        existing = cls.output.read_by_input_key(input_data_key)
-        reference_msg = f"{input_data_key} from {cls.input.name}"
-        if existing:
-            msg = f"{cls.name} already executed for {reference_msg}. Skipping."
-            if output_callback:
-                output_callback(msg + "\n")
-            return (msg, None)
-
-        # ****
-        # Otherwise, create a new record
+        # Create a new record. Doesn't need to check if the process has already been run
         data = {
-            "data": "User-specific single-run data."
+            "data": f"Random data: {str(os.urandom(8))}"
         }
         cls.output.create_entry(
             data=data,
@@ -56,11 +51,12 @@ class StoreText(AppProcess):
             input_data_key=input_data_key,
         )
 
+        reference_msg = f"{input_data_key} from {cls.input}"
         msg = f"{cls.name} completed for {reference_msg}."
         if output_callback:
             output_callback(msg + "\n")
         return (msg, data)
-    
+
 # ****
 if __name__ == "__main__":
     raise Exception("This script is not meant to be run directly.")

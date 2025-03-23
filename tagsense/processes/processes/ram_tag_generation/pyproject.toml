@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "ramsupport"
+version = "0.1.0"
+description = "Optional support for my_package"
+authors = ["Your Name <you@example.com>"]
+packages = [{ include = "ramsupport" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pillow = "^11.1.0"
+
+torch = "^2.6.0"
+torchvision = "^0.21.0"
+transformers = "^4.49.0"
+scipy = "^1.15.2"
+timm = "^1.0.15"
+fairscale = "^0.4.13"
