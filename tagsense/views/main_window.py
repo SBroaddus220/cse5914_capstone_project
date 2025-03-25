@@ -111,8 +111,8 @@ class MainWindow(QMainWindow):
         file_menu.addAction(run_processes_action)
         file_menu.addAction(install_processes_action)
         file_menu.addAction(export_dialog_action)
+        file_menu.addAction(settings_action)
         
-        help_menu.addAction(settings_action)
         help_menu.addAction(help_action)
         
     def init_central_data_view(self) -> None:
