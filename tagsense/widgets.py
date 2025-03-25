@@ -188,7 +188,7 @@ class CustomGridTableWidget(QWidget):
             if pixmap.isNull():
                 thumbnail_item.setText(f"idx: {row_idx}\nNo thumbnail")
             else:
-                scaled_pix = pixmap.scaled(128, 128, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                scaled_pix = pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
                 thumbnail_item.setIcon(QIcon(scaled_pix))
 
             thumbnail_item.setData(Qt.ItemDataRole.UserRole, row_idx)
