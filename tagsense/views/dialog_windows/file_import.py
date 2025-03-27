@@ -103,14 +103,15 @@ class FileImport(QDialog):
         """Opens a file selection dialog."""
         file_dialog = QFileDialog(self)
         file_dialog.setWindowTitle("Import Media")
-        file_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        file_dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
         file_dialog.setViewMode(QFileDialog.ViewMode.Detail)
 
         # Select files
         if file_dialog.exec():
             selected_files = file_dialog.selectedFiles()
             if selected_files:
-                self.set_file_path(selected_files[0])
+                for file in selected_files:
+                    self.set_file_path(file)
 
     def set_file_path(self, file_path: Path) -> None:
         """Performs necessary checks and sets the file path."""
