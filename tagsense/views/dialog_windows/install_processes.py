@@ -27,7 +27,7 @@ class InstallProcessesDialog(QDialog):
         # ****
         super().__init__(parent)
         self.setWindowTitle("Install Processes")
-        self.setGeometry(100, 100, 600, 400)
+        self.setGeometry(100, 100, 1200, 750)
 
         # ****
         # Fetch processes to install

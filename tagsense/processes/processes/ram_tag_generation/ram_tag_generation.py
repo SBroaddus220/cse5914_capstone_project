@@ -8,7 +8,9 @@ Example algorithm to generate RAM tags.
 import sys
 import logging
 import shutil
+import requests
 import subprocess
+from tqdm import tqdm
 from pathlib import Path
 from typing import Tuple, Optional
 
@@ -76,6 +78,30 @@ class RAMGenerateTags(AppProcess):
             raise FileNotFoundError("Poetry executable not found.")
 
         try:
+            pth_path = Path(__file__).parent / "ram_plus_swin_large_14m.pth"
+            if not pth_path.exists():
+                print(f"[Installer] Downloading model weights to {pth_path}...")
+                url = "https://huggingface.co/xinyu1205/recognize-anything-plus-model/resolve/main/ram_plus_swin_large_14m.pth"
+
+                # Send a HEAD request first to get the file size
+                response = requests.get(url, stream=True)
+                response.raise_for_status()
+                total_size = int(response.headers.get('content-length', 0))
+
+                chunk_size = 1024  # 1 KB
+                with open(pth_path, 'wb') as f, tqdm(
+                    desc="Downloading",
+                    total=total_size,
+                    unit='B',
+                    unit_scale=True,
+                    unit_divisor=1024,
+                ) as bar:
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        f.write(chunk)
+                        bar.update(len(chunk))
+                print("[Installer] Model weights downloaded successfully.")
+
+            
             # First install command
             cls._run_and_stream([
                 sys.executable, "-m", "pip", "install", "git+https://github.com/xinyu1205/recognize-anything.git"

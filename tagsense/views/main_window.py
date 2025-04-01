@@ -73,6 +73,7 @@ class MainWindow(QMainWindow):
         
         self.setWindowTitle("DoomFile9000")
         self.setMinimumSize(800, 600)
+        self.showMaximized()
         self.show()
 
     def init_menus(self) -> None:

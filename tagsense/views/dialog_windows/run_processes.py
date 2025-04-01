@@ -30,7 +30,7 @@ class RunProcesses(QDialog):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Run Processes")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(100, 100, 1200, 750)
         
         # ****
         # Fetch data structures and processes

@@ -37,7 +37,7 @@ class FileImport(QDialog):
         """Initializes window and its UI elements."""
         super().__init__(parent)
         self.setWindowTitle("Import Files")
-        self.setGeometry(100, 100, 600, 500)
+        self.setGeometry(100, 100, 1200, 750)
         self.conn = conn
         
         # Fetch processes
