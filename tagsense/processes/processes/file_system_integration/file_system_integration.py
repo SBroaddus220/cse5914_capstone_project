@@ -9,7 +9,7 @@ import os
 import sqlite3
 import shutil
 import logging
-import hashlib
+import blake3
 from datetime import datetime
 from typing import Tuple, Optional
 from pathlib import Path
@@ -52,10 +52,10 @@ class FileSystemIntegration(AppProcess):
     
         # ****
         # Hash the file and check if it already exists in the database
-        md5_hash = cls._calculate_md5(file_path)
+        blake3_hash = cls._calculate_blake3(file_path)
         if output_callback:
-            output_callback(f"Calculated MD5: {md5_hash}\n")
-        existing = cls.output.read(column_name="md5_hash", value=md5_hash)
+            output_callback(f"Calculated BLAKE3: {blake3_hash}\n")
+        existing = cls.output.read(column_name="blake3_hash", value=blake3_hash)
         if existing:
             message = f"{cls.name} already executed for {file_path} and has entry key {existing['entry_key']}. Skipping."
             if output_callback:
@@ -66,7 +66,7 @@ class FileSystemIntegration(AppProcess):
         # If not, create new record
         _, original_name = os.path.split(file_path)
         file_extension = os.path.splitext(original_name)[1].lower()
-        new_filename = f"{md5_hash}{file_extension}"
+        new_filename = f"{blake3_hash}{file_extension}"
 
         destination_dir = CLIENT_FILES_DIR
         os.makedirs(destination_dir, exist_ok=True)
@@ -79,7 +79,7 @@ class FileSystemIntegration(AppProcess):
         import_timestamp = datetime.now().isoformat()
 
         data = {
-            "md5_hash": md5_hash,
+            "blake3_hash": blake3_hash,
             "original_name": original_name,
             "file_path": destination_path,
             "original_file_path": file_path,
@@ -102,22 +102,22 @@ class FileSystemIntegration(AppProcess):
         return (msg, data)
 
     @classmethod
-    def _calculate_md5(self, file_path: Path) -> str:
+    def _calculate_blake3(self, file_path: Path) -> str:
         """
-        Calculates the MD5 hash of a given file.
+        Calculates the BLAKE3 hash of a given file.
 
         Args:
             file_path (Path): The path to the file.
 
         Returns:
-            str: The MD5 hash in hexadecimal format.
+            str: The BLAKE3 hash in hexadecimal format.
         """
-        hash_md5 = hashlib.md5()
+        hash_blake3 = blake3.blake3()
         with open(file_path, "rb") as f:
             # Read the file in chunks to avoid large memory usage
             for chunk in iter(lambda: f.read(4096), b""):
-                hash_md5.update(chunk)
-        return hash_md5.hexdigest()
+                hash_blake3.update(chunk)
+        return hash_blake3.hexdigest()
 
 # ****
 if __name__ == "__main__":
