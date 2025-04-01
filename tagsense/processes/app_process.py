@@ -7,6 +7,7 @@ Application wrapper for processes.
 # **** IMPORTS ****
 import logging
 import sqlite3
+from pathlib import Path
 from typing import Callable, Any, Tuple, Optional
 
 from tagsense import registry
@@ -24,7 +25,6 @@ class AppProcess(Process):
 
     # **** CLASS VARIABLES ****
     requires_installation: bool = False
-    conn: sqlite3.Connection  # Remember to dynamically set this in the main application
 
     def __init_subclass__(cls, **kwargs):
         """

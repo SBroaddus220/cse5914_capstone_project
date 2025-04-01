@@ -5,6 +5,7 @@ Example algorithm to generate RAM tags.
 """
 
 # **** IMPORTS ****
+import sys
 import logging
 import shutil
 import subprocess
@@ -27,9 +28,8 @@ class RAMGenerateTags(AppProcess):
     requires_installation: bool = True
     
     @classmethod
-    def execute(cls, input_data_key: str, output_callback=None) -> Tuple[str, Optional[dict]]:
-        if output_callback:
-            output_callback(f"Running {cls.name}...\n")
+    def execute(cls, input_data_key: str) -> Tuple[str, Optional[dict]]:
+        print(f"Running {cls.name}...\n")
             
         # ****
         # Check if the process has already been run
@@ -37,8 +37,7 @@ class RAMGenerateTags(AppProcess):
         reference_msg = f"{input_data_key} from {cls.input.name}"
         if existing:
             msg = f"{cls.name} already executed for {reference_msg}. Skipping."
-            if output_callback:
-                output_callback(msg + "\n")
+            print(msg + "\n")
             return (msg, None)
         
         # ****
@@ -46,8 +45,7 @@ class RAMGenerateTags(AppProcess):
         file_record = cls.input.read_by_entry_key(input_data_key)
         if not file_record:
             msg = "No matching file record found in database."
-            if output_callback:
-                output_callback(msg + "\n")
+            print(msg + "\n")
             return (msg, None)
         
         file_path: str = Path(file_record["file_path"]).as_posix()
@@ -62,29 +60,57 @@ class RAMGenerateTags(AppProcess):
         )
         
         msg = f"{cls.name} process completed for {reference_msg}."
-        if output_callback:
-            output_callback(msg + "\n")
+        print(msg + "\n")
         return (msg, data)
 
     @classmethod
     def install(cls) -> None:
         """Installs the process."""
         super().install()
+
         path = Path(__file__).resolve().parent
-        print(path)
-        # Find poetry executable
+        print(f"[Installer] Installing in: {path}")
+
         poetry_executable = shutil.which("poetry")
         if poetry_executable is None:
             raise FileNotFoundError("Poetry executable not found.")
+
         try:
-            import sys
-            subprocess.check_call([
+            # First install command
+            cls._run_and_stream([
                 sys.executable, "-m", "pip", "install", "git+https://github.com/xinyu1205/recognize-anything.git"
             ])
-            subprocess.check_call([poetry_executable, "install"], cwd=path.as_posix())
-            print("Optional support installed successfully.")
+
+            # Second install command
+            cls._run_and_stream([
+                poetry_executable, "install"
+            ], cwd=path.as_posix())
+
+            print("[Installer] Optional support installed successfully.")
+
         except subprocess.CalledProcessError as e:
-            print("Installation failed:", e)
+            print("[Installer] Installation failed:", e)
+
+    @staticmethod
+    def _run_and_stream(cmd, cwd=None):
+        """Runs a command and prints output line-by-line to stdout."""
+        print(f"[Running] {' '.join(cmd)}")
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            cwd=cwd,
+            bufsize=1
+        )
+
+        # Stream output line-by-line
+        for line in process.stdout:
+            print(line.rstrip())
+
+        returncode = process.wait()
+        if returncode != 0:
+            raise subprocess.CalledProcessError(returncode, cmd)
             
     @classmethod
     def generate_tags(cls, file_path) -> str:

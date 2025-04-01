@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 )
 
 from tagsense import registry
-from tagsense.widgets import RunProcessesWidget
+from tagsense.widgets import RunProcessesWidget, ProcessWorkerBase
 
 # **** LOGGING ****
 logger = logging.getLogger(__name__)
@@ -41,6 +41,13 @@ class InstallProcessesDialog(QDialog):
         self.install_processes_widget = InstallProcessesWidget(self.processes)
         self.main_layout.addWidget(self.install_processes_widget)
         
+class InstallProcessWorker(ProcessWorkerBase):
+    def run(self):
+        try:
+            self._emit_output_from_callable(self.process.install)
+            self.finished.emit("Installed", {})
+        except Exception as e:
+            pass  # Error already emitted in base class
 
 class InstallProcessesWidget(RunProcessesWidget):
     def __init__(self, processes: List, parent=None) -> None:
@@ -51,11 +58,9 @@ class InstallProcessesWidget(RunProcessesWidget):
         super()._init_ui()
         self.process_button.setText("Install")
 
-    def run_process(self, process, output_callback) -> Tuple[str, dict]:
-        """Installs the process."""
-        # Install the process
-        process.install()
-        return ("Installed", {})
+    def run_process(self, process):
+        """Runs the install process asynchronously in a worker thread."""
+        self.run_worker(InstallProcessWorker, process)
     
     def handle_process_completion(self, process, msg: str, data: dict) -> bool:
         return True

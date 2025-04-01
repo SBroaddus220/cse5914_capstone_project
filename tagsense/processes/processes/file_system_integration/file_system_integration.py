@@ -33,11 +33,10 @@ class FileSystemIntegration(AppProcess):
     output: AppDataStructure = Files
 
     @classmethod
-    def execute(cls, input_data_key: str, output_callback=None) -> Tuple[str, Optional[dict]]:
+    def execute(cls, input_data_key: str) -> Tuple[str, Optional[dict]]:
         """Execute the process. Assumes "file_path" is a key in the input data structure."""
         
-        if output_callback:
-            output_callback(f"Executing {cls.name}...\n")
+        print(f"Executing {cls.name}...\n")
 
         # ****
         # Parse the input data
@@ -45,21 +44,18 @@ class FileSystemIntegration(AppProcess):
         if not input_data:
             err_msg = f"Error in {cls.name}: No data found for key {input_data_key}."
             logger.error(err_msg)
-            if output_callback:
-                output_callback(err_msg + "\n")
+            print(err_msg + "\n")
             return (err_msg, None)
         file_path = input_data["file_path"]
     
         # ****
         # Hash the file and check if it already exists in the database
         md5_hash = cls._calculate_md5(file_path)
-        if output_callback:
-            output_callback(f"Calculated MD5: {md5_hash}\n")
+        print(f"Calculated MD5: {md5_hash}\n")
         existing = cls.output.read(column_name="md5_hash", value=md5_hash)
         if existing:
             message = f"{cls.name} already executed for {file_path} and has entry key {existing['entry_key']}. Skipping."
-            if output_callback:
-                output_callback(f"{message}\n")
+            print(message + "\n")
             return (message, None)
         
         # ****
@@ -97,8 +93,7 @@ class FileSystemIntegration(AppProcess):
         )
 
         msg = f"{cls.name} completed for {original_name}."
-        if output_callback:
-            output_callback(f"{msg}.\n")
+        print(msg + "\n")
         return (msg, data)
 
     @classmethod

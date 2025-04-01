@@ -70,12 +70,11 @@ class Process:
         return cls.name
 
     @classmethod
-    def execute(cls, input_data_key: str, output_callback: Callable[[str], None] | None) -> Tuple[Any, Optional[dict]]:
+    def execute(cls, input_data_key: str) -> Tuple[Any, Optional[dict]]:
         """Execute the process.
 
         Args:
             input_data_key (str): The key of the input data.
-            output_callback (Callable[[str], None] | None): Callback function to output messages.
 
         Returns:
             Tuple[Any, Optional[dict]]: Message from the process and dictionary of processed data if successful.

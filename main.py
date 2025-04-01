@@ -53,8 +53,7 @@ def main() -> None:
         db_path.touch()
     
     conn = get_db_connection(DB_PATH)  # Open DB connection
-    AppDataStructure.conn = conn  # Set the connection for all data structures
-    AppProcess.conn = conn  # Set the connection for all processes
+    AppDataStructure.db_path = db_path
 
     try:
         # ****
