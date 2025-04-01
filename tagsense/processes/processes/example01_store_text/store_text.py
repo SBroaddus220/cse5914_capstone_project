@@ -31,7 +31,6 @@ class StoreText(AppProcess):
         """
         Stores a single run entry.
         """
-        raise NotImplementedError("This process is not implemented.")
         print(f"Running {cls.name}...\n")
 
         # ****
