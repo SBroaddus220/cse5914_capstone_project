@@ -294,25 +294,50 @@ class ProcessWorkerBase(QObject):
         self.process = process
 
     def _emit_output_from_callable(self, callable_fn):
-        stdout_buffer = io.StringIO()
-        stderr_buffer = io.StringIO()
+        # Create pipes
+        stdout_r, stdout_w = os.pipe()
+        stderr_r, stderr_w = os.pipe()
 
-        with contextlib.redirect_stdout(stdout_buffer), contextlib.redirect_stderr(stderr_buffer):
-            try:
-                result = callable_fn()
-            except Exception as e:
-                self.error.emit(f"{str(e)}\n{traceback.format_exc()}")
-                raise
+        result_container = {}
 
-        out_lines = stdout_buffer.getvalue().splitlines()
-        err_lines = stderr_buffer.getvalue().splitlines()
+        def forward_pipe_output(fd, emit_fn, label):
+            with os.fdopen(fd, 'r', encoding='utf-8', errors='ignore') as stream:
+                for line in stream:
+                    emit_fn(f"{label}: {line.rstrip()}")
 
-        for line in out_lines:
-            self.output.emit(f"{line}")
-        for line in err_lines:
-            self.output.emit(f"{line}")
+        stdout_thread = threading.Thread(target=forward_pipe_output, args=(stdout_r, self.output.emit, "OUT"), daemon=True)
+        stderr_thread = threading.Thread(target=forward_pipe_output, args=(stderr_r, self.output.emit, "ERR"), daemon=True)
+        stdout_thread.start()
+        stderr_thread.start()
 
-        return result
+        real_stdout = os.dup(1)
+        real_stderr = os.dup(2)
+
+        try:
+            os.dup2(stdout_w, 1)
+            os.dup2(stderr_w, 2)
+
+            result_container["result"] = callable_fn()  # this must return (msg, data)
+
+        except Exception as e:
+            self.error.emit(f"{str(e)}\n{traceback.format_exc()}")
+            raise
+
+        finally:
+            sys.stdout.flush()
+            sys.stderr.flush()
+
+            os.dup2(real_stdout, 1)
+            os.dup2(real_stderr, 2)
+
+            os.close(stdout_w)
+            os.close(stderr_w)
+
+            stdout_thread.join()
+            stderr_thread.join()
+
+        return result_container["result"]
+
 
 class ExecuteProcessWorker(ProcessWorkerBase):
     def __init__(self, process, input_keys: list[str]):
@@ -323,9 +348,7 @@ class ExecuteProcessWorker(ProcessWorkerBase):
         try:
             final_msg, final_data = None, None
             for key in self.input_keys:
-                msg, data = self._emit_output_from_callable(
-                    lambda: self.process.execute(input_data_key=key)
-                )
+                msg, data = self._emit_output_from_callable(lambda: self.process.execute(input_data_key=key))
                 final_msg, final_data = msg, data  # could be overwritten multiple times
             self.finished.emit(final_msg, final_data)
         except Exception as e:
