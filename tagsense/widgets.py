@@ -145,19 +145,19 @@ class CustomGridTableWidget(QWidget):
 
         # ****
         # Fetch results
-        results = self.current_search.fetch_results(self.entry_whitelist, self.entry_blacklist)
+        self.results = self.current_search.fetch_results(self.entry_whitelist, self.entry_blacklist)
         
         # ****
         # Check if there are any results
-        if not results:
+        if not self.results:
             self.table_widget.setColumnCount(0)
             return
-        for item in results:  # Add preview key to each item
+        for item in self.results:  # Add preview key to each item
             item["preview"] = ""
 
         # ****
         # Prepare table
-        columns = list(results[0].keys())
+        columns = list(self.results[0].keys())
         self.table_widget.setColumnCount(len(columns))
         self.table_widget.setHorizontalHeaderLabels(columns)
         self.table_widget.horizontalHeader().setStretchLastSection(True)
@@ -173,7 +173,7 @@ class CustomGridTableWidget(QWidget):
 
         # ****
         # Populate data view
-        for row_idx, record in enumerate(results):
+        for row_idx, record in enumerate(self.results):
             # ****
             # Table view
             self.table_widget.insertRow(row_idx)
@@ -208,12 +208,20 @@ class CustomGridTableWidget(QWidget):
         if not self.current_search:
             return
         row_idx = item.row()
-        self.open_detail_window(self.current_search, row_idx)
+        item_data = self.results[row_idx]
+        entry_key = item_data.get('entry_key')
+        search_results = self.current_search.fetch_results()
+        item_index = next(i for i, d in enumerate(search_results) if d.get('entry_key') == entry_key)
+        self.open_detail_window(self.current_search, item_index)
 
     def handle_grid_item_double_click(self, item: QListWidgetItem) -> None:
         """Opens detail window when a user double-clicks a thumbnail item."""
         row_idx = self.grid_widget.row(item)
-        self.open_detail_window(self.current_search, row_idx)
+        item_data = self.results[row_idx]
+        entry_key = item_data.get('entry_key')
+        search_results = self.current_search.fetch_results()
+        item_index = next(i for i, d in enumerate(search_results) if d.get('entry_key') == entry_key)
+        self.open_detail_window(self.current_search, item_index)
 
     def open_detail_window(self, search: Search, record_idx: int) -> None:
         """Opens a window for details on a specific data item."""
