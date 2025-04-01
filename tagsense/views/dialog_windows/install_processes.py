@@ -5,6 +5,7 @@ Dialog window for installing processes.
 """
 
 # **** IMPORTS ****
+import traceback
 import logging
 from typing import List, Any, Tuple
 from PyQt6.QtCore import Qt
@@ -47,7 +48,9 @@ class InstallProcessWorker(ProcessWorkerBase):
             self._emit_output_from_callable(self.process.install)
             self.finished.emit("Installed", {})
         except Exception as e:
-            pass  # Error already emitted in base class
+            pass
+        finally:
+            self.finished.emit("Failed", {})
 
 class InstallProcessesWidget(RunProcessesWidget):
     def __init__(self, processes: List, parent=None) -> None:

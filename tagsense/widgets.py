@@ -9,6 +9,7 @@ import os
 import io
 import sys
 import time
+import select
 import threading
 import logging
 import contextlib
@@ -283,7 +284,6 @@ class OutputRouter(QObject):
 
     def flush(self):
         pass  # Required for file-like compatibility
-
 class ProcessWorkerBase(QObject):
     output = pyqtSignal(str)
     error = pyqtSignal(str)
@@ -294,19 +294,21 @@ class ProcessWorkerBase(QObject):
         self.process = process
 
     def _emit_output_from_callable(self, callable_fn):
-        # Create pipes
         stdout_r, stdout_w = os.pipe()
         stderr_r, stderr_w = os.pipe()
 
         result_container = {}
 
-        def forward_pipe_output(fd, emit_fn, label):
-            with os.fdopen(fd, 'r', encoding='utf-8', errors='ignore') as stream:
-                for line in stream:
-                    emit_fn(f"{label}: {line.rstrip()}")
+        def read_fd(fd, emit_fn, label):
+            try:
+                with os.fdopen(fd, 'r', encoding='utf-8', errors='ignore') as stream:
+                    for line in stream:
+                        emit_fn(f"{label}: {line.rstrip()}")
+            except Exception as e:
+                emit_fn(f"ERR: Reader thread error: {e}")
 
-        stdout_thread = threading.Thread(target=forward_pipe_output, args=(stdout_r, self.output.emit, "OUT"), daemon=True)
-        stderr_thread = threading.Thread(target=forward_pipe_output, args=(stderr_r, self.output.emit, "ERR"), daemon=True)
+        stdout_thread = threading.Thread(target=read_fd, args=(stdout_r, self.output.emit, "OUT"), daemon=True)
+        stderr_thread = threading.Thread(target=read_fd, args=(stderr_r, self.output.emit, "ERR"), daemon=True)
         stdout_thread.start()
         stderr_thread.start()
 
@@ -317,11 +319,11 @@ class ProcessWorkerBase(QObject):
             os.dup2(stdout_w, 1)
             os.dup2(stderr_w, 2)
 
-            result_container["result"] = callable_fn()  # this must return (msg, data)
+            result_container["result"] = callable_fn()
 
         except Exception as e:
-            self.error.emit(f"{str(e)}\n{traceback.format_exc()}")
-            raise
+            self.error.emit(f"Exception: {str(e)}\n{traceback.format_exc()}")
+            result_container["result"] = ("Error", {})  # Ensure dict return
 
         finally:
             sys.stdout.flush()
@@ -333,11 +335,10 @@ class ProcessWorkerBase(QObject):
             os.close(stdout_w)
             os.close(stderr_w)
 
-            stdout_thread.join()
-            stderr_thread.join()
+            stdout_thread.join(timeout=2)
+            stderr_thread.join(timeout=2)
 
         return result_container["result"]
-
 
 class ExecuteProcessWorker(ProcessWorkerBase):
     def __init__(self, process, input_keys: list[str]):
@@ -345,14 +346,19 @@ class ExecuteProcessWorker(ProcessWorkerBase):
         self.input_keys = input_keys
 
     def run(self):
+        final_msg, final_data = None, {}
         try:
-            final_msg, final_data = None, None
             for key in self.input_keys:
-                msg, data = self._emit_output_from_callable(lambda: self.process.execute(input_data_key=key))
-                final_msg, final_data = msg, data  # could be overwritten multiple times
-            self.finished.emit(final_msg, final_data)
-        except Exception as e:
-            pass  # Error already emitted in base class
+                msg, data = self._emit_output_from_callable(
+                    lambda: self.process.execute(input_data_key=key)
+                )
+                final_msg, final_data = msg, data
+        except Exception:
+            pass  # Error already emitted
+        finally:
+            self.finished.emit(final_msg or "Error", final_data or {})
+
+
 
 class RunProcessesWidget(QWidget):
     def __init__(self, processes: List, data_structures_to_entry_keys: Dict[Any, List], parent=None):
@@ -661,13 +667,14 @@ class RunProcessesWidget(QWidget):
                 checkbox.setChecked(False)
                 checkbox.setDisabled(True)
 
+            completion_status = "Failed"
+            completion_color = "red"
             if success:
-                status_edit.setText("Completed")
-            else:
-                status_edit.setText("Failed")
+                completion_status = "Completed"
+                completion_color = "lightgray"
 
-            row_widget.setStyleSheet("background-color: lightgray;")
-            status_edit.setText(f"Done at {time.ctime(end_time)} (took {int(duration)}s)")
+            row_widget.setStyleSheet(f"background-color: {completion_color};")
+            status_edit.setText(f"{completion_status} at {time.ctime(end_time)} (took {int(duration)}s)")
 
             # Scroll to keep the latest in view
             QTimer.singleShot(100, lambda: self.processes_scroll_area.verticalScrollBar().setValue(
