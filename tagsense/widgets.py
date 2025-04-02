@@ -269,21 +269,24 @@ class CustomGridTableWidget(QWidget):
 
 class OutputRouter(QObject):
     output_ready = pyqtSignal(str)
-
     _instance = None
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(OutputRouter, cls).__new__(cls)
-            super(OutputRouter, cls._instance).__init__()
+            instance = super().__new__(cls)
+            super(OutputRouter, instance).__init__()  # 💥 call super init *once* here
+            cls._instance = instance
         return cls._instance
 
     def write(self, message):
-        if message.strip():  # ignore empty lines
+        if message.strip():
             self.output_ready.emit(message)
 
     def flush(self):
-        pass  # Required for file-like compatibility
+        pass
+
+
+
 class ProcessWorkerBase(QObject):
     output = pyqtSignal(str)
     error = pyqtSignal(str)

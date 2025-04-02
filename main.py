@@ -3,6 +3,8 @@
 """
 Entry point for the application.
 """
+import faulthandler
+faulthandler.enable()  # Enable fault handler for better error reporting
 
 # **** IMPORTS ****
 import sys
