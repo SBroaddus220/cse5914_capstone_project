@@ -41,7 +41,7 @@ class FileImport(QDialog):
         self.conn = conn
         
         # Fetch processes
-        self.processes = registry.installed_processes
+        self.processes = registry.fetch_installed_processes()
 
         # Sort processes to ensure dependencies are run first
         # TODO: Identify dependencies and determine good way to inform user

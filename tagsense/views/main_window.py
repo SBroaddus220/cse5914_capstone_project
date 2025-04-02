@@ -96,7 +96,7 @@ class MainWindow(QMainWindow):
         install_processes_action = QAction("Install Processes", self)
         install_processes_action.triggered.connect(lambda: (
             QMessageBox.information(self, "No Processes", "No processes to install.")
-            if not (registry.process_registry - registry.installed_processes)
+            if not (registry.process_registry - registry.fetch_installed_processes())
             else InstallProcessesDialog(self).exec()
         ))
         export_dialog_action = QAction("Export Search", self)

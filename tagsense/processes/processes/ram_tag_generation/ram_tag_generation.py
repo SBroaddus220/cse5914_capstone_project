@@ -68,8 +68,6 @@ class RAMGenerateTags(AppProcess):
     @classmethod
     def install(cls) -> None:
         """Installs the process."""
-        super().install()
-
         path = Path(__file__).resolve().parent
         print(f"[Installer] Installing in: {path}")
 
@@ -116,6 +114,8 @@ class RAMGenerateTags(AppProcess):
 
         except subprocess.CalledProcessError as e:
             print("[Installer] Installation failed:", e)
+
+        super().install()
 
     @staticmethod
     def _run_and_stream(cmd, cwd=None):

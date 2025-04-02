@@ -35,7 +35,7 @@ class RunProcesses(QDialog):
         # ****
         # Fetch data structures and processes
         self.data_structures: List[DataStructure] = registry.detected_data_structures
-        self.processes = registry.installed_processes
+        self.processes = registry.fetch_installed_processes()
         
         # ****
         # Define layout

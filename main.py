@@ -63,9 +63,14 @@ def main() -> None:
             discovered_process: AppProcess
             if discovered_process.requires_installation:
                 installed = registry.is_process_installed(discovered_process)
-                logger.info(f"⚠️ {discovered_process.__name__} requires installation. Installed: {installed}")
+                if not installed:
+                    logger.info(f"Process {discovered_process.name} is not installed...")
             else:
-                registry.mark_process_as_installed(discovered_process)
+                try:
+                    registry.mark_process_as_installed(discovered_process)
+                    logger.info(f"Process {discovered_process.name} marked as installed.")
+                except Exception as e:
+                    pass
             registry.register_processes({discovered_process})
 
         # Remove manual data structure from detected data structures

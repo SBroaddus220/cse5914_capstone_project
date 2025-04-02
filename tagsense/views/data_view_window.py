@@ -244,7 +244,7 @@ class DataViewWindow(QMainWindow):
             data_structure_to_searches[search.data_structure].add(search)
 
         # Find children
-        for process in registry.installed_processes:
+        for process in registry.fetch_installed_processes():
             # Filter any process that can't have the current record as input
             if not process.input == current_search.data_structure:
                 continue

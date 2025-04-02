@@ -31,7 +31,7 @@ class InstallProcessesDialog(QDialog):
 
         # ****
         # Fetch processes to install
-        self.processes = registry.process_registry - registry.installed_processes
+        self.processes = registry.process_registry - registry.fetch_installed_processes()
         
         # ****
         # Define layout

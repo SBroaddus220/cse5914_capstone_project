@@ -7,9 +7,7 @@ Interface for the SQLite database.
 # **** IMPORTS ****
 import logging
 import sqlite3
-import sqlparse
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
 
 # **** LOGGING ****
 logger = logging.getLogger(__name__)
