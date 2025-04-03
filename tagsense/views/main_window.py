@@ -89,7 +89,7 @@ class MainWindow(QMainWindow):
         # **
         # Actions
         open_dialog_action = QAction("Import Files", self)
-        open_dialog_action.triggered.connect(lambda: FileImport(conn=self.conn, parent=self).exec())
+        open_dialog_action.triggered.connect(self._handle_file_import_dialog_exec)
         run_processes_action = QAction("Run Processes", self)
         run_processes_action.triggered.connect(lambda: RunProcesses(self).exec())
         install_processes_action = QAction("Install Processes", self)
@@ -242,6 +242,17 @@ class MainWindow(QMainWindow):
         """Handle the explicit data search."""
         typed_expr = self.explicit_data_search_input.text().strip()
         self._update_by_explicit_data_search(typed_expr)
+
+    def _handle_populate_data_view(self) -> None:
+        """Handle the window refresh."""
+        self.data_view.populate_data_view()
+
+    def _handle_file_import_dialog_exec(self) -> None:
+        """Refresh the main window when the process completes."""
+        print("handling file imports")
+        self.file_import_dialog = FileImport(conn=self.conn, parent=self)
+        self.file_import_dialog.process_completion_refresh.connect(self._handle_populate_data_view)
+        self.file_import_dialog.exec()
         
     def _update_by_explicit_data_search(self, query: str) -> None:
         """Parse and update the data view based on the explicit data search."""

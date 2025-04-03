@@ -253,6 +253,8 @@ class CustomGridTableWidget(QWidget):
         return dict(zip(headers, values))
 
 class RunProcessesWidget(QWidget):
+    process_completion_refresh: pyqtSignal = pyqtSignal()
+
     def __init__(self, processes: List, data_structures_to_entry_keys: Dict[Any, List], parent=None):
         super().__init__(parent)
         self.processes = processes
@@ -292,7 +294,7 @@ class RunProcessesWidget(QWidget):
         self.cancel_button.clicked.connect(self.parent().close if self.parent() else self.close)
         
         self.process_button = QPushButton("Process")
-        self.process_button.clicked.connect(self.run_selected_processes)
+        self.process_button.clicked.connect(self._handle_process_button_clicked)
         
         # Button layout
         button_layout = QHBoxLayout()
@@ -412,6 +414,11 @@ class RunProcessesWidget(QWidget):
             if checkbox.isEnabled():
                 checkbox.setChecked(select_state)
         self.update_process_button_state()
+
+    def _handle_process_button_clicked(self) -> None:
+        print("handling buttton click")
+        self.run_selected_processes()
+        self.process_completion_refresh.emit()
         
     def run_selected_processes(self) -> None:
         """Runs the selected processes in order."""

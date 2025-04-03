@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Set, Optional
 from collections import deque
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QVBoxLayout, QSplitter, QGroupBox, QWidget, QCheckBox,
     QLabel, QLineEdit, QPlainTextEdit, QPushButton, QFileDialog, QMessageBox,
@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 # **** CLASSES ****
 class FileImport(QDialog):
     """Dialog for importing files and running processes."""
+    process_completion_refresh: pyqtSignal = pyqtSignal()
 
     def __init__(self, conn: sqlite3.Connection, parent=None) -> None:
         """Initializes window and its UI elements."""
@@ -86,6 +87,7 @@ class FileImport(QDialog):
         # ****
         # Processes
         self.run_selected_processes_widget = RunFileProcessesWidget(self.processes, None, self)
+        self.run_selected_processes_widget.process_completion_refresh.connect(lambda: self.process_completion_refresh.emit())
 
         # ****
         # Splitter for vertical sections
