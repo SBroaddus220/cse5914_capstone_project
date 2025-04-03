@@ -38,11 +38,11 @@ class FileImport(QDialog):
         """Initializes window and its UI elements."""
         super().__init__(parent)
         self.setWindowTitle("Import Files")
-        self.setGeometry(100, 100, 600, 500)
+        self.setGeometry(100, 100, 1200, 750)
         self.conn = conn
         
         # Fetch processes
-        self.processes = registry.installed_processes
+        self.processes = registry.fetch_installed_processes()
 
         # Sort processes to ensure dependencies are run first
         # TODO: Identify dependencies and determine good way to inform user
@@ -105,14 +105,15 @@ class FileImport(QDialog):
         """Opens a file selection dialog."""
         file_dialog = QFileDialog(self)
         file_dialog.setWindowTitle("Import Media")
-        file_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        file_dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
         file_dialog.setViewMode(QFileDialog.ViewMode.Detail)
 
         # Select files
         if file_dialog.exec():
             selected_files = file_dialog.selectedFiles()
             if selected_files:
-                self.set_file_path(selected_files[0])
+                for file in selected_files:
+                    self.set_file_path(file)
 
     def set_file_path(self, file_path: Path) -> None:
         """Performs necessary checks and sets the file path."""

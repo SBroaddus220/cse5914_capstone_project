@@ -10,7 +10,7 @@ import logging
 from typing import List, Dict, Any
 from PIL import ImageQt
 
-from PyQt6.QtCore import QSize, Qt, QEvent
+from PyQt6.QtCore import QSize, Qt, QEvent, QTimer
 
 from PyQt6.QtGui import QPixmap, QIcon, QKeyEvent
 from PyQt6.QtWidgets import (
@@ -46,6 +46,8 @@ class DataViewWindow(QMainWindow):
         # Initialize the UI
         self.init_ui()
         self.update_with_record(self.current_search, self.record_idx)
+
+
         
     def init_ui(self):
         # ****
@@ -80,6 +82,13 @@ class DataViewWindow(QMainWindow):
         
         self._main_widget.addWidget(self._left_scroll_area)
         self._main_widget.addWidget(self._center_scroll_area)
+        QTimer.singleShot(0, self._set_splitter_sizes)
+
+    def _set_splitter_sizes(self):
+        total_width = self._main_widget.width()
+        left_width = int(total_width * 0.25)
+        right_width = total_width - left_width
+        self._main_widget.setSizes([left_width, right_width])
         
     def keyPressEvent(self, event: QKeyEvent) -> None:
         # Handle left/right arrow key presses for navigating records
@@ -235,7 +244,7 @@ class DataViewWindow(QMainWindow):
             data_structure_to_searches[search.data_structure].add(search)
 
         # Find children
-        for process in registry.installed_processes:
+        for process in registry.fetch_installed_processes():
             # Filter any process that can't have the current record as input
             if not process.input == current_search.data_structure:
                 continue

@@ -13,6 +13,7 @@ import jsonschema
 from pathlib import Path
 from typing import Any, Dict, Optional, List, Union, Tuple 
 
+from tagsense.database import get_db_connection
 from tagsense.data_structures.sqlite_table import SQLITETable
 from tagsense.data_structures.data_structure import DataStructure
 
@@ -26,7 +27,7 @@ class AppDataStructure(DataStructure):
 
     # **** CLASS ATTRIBUTES ****
     table: SQLITETable
-    conn: sqlite3.Connection  # Remember to dynamically set this in the main application
+    db_path: Path
     
     # **** DUNDER METHODS ****
     def __init_subclass__(cls, **kwargs):
@@ -62,8 +63,9 @@ class AppDataStructure(DataStructure):
             conn (sqlite3.Connection): SQLite database connection.
         """
         super().initialize()
-        cls.table.create_table(cls.conn)
-        cls.table.verify_table(cls.conn)
+        with get_db_connection(cls.db_path) as conn:
+            cls.table.create_table(conn)
+            cls.table.verify_table(conn)
         
     @classmethod
     def verify(cls):
@@ -111,7 +113,8 @@ class AppDataStructure(DataStructure):
             raise ValueError(f"Missing required fields: {missing_fields}")
 
         # Insert the data
-        cls.table.insert_record(cls.conn, data)
+        with get_db_connection(cls.db_path) as conn:
+            cls.table.insert_record(conn, data)
 
         return entry_key, data
     
@@ -127,10 +130,11 @@ class AppDataStructure(DataStructure):
         Returns:
             Optional[Dict[str, Any]]: The retrieved data, if found.
         """
-        existing_record = cls.conn.execute(
-            f"SELECT * FROM {cls.table.table_name} WHERE {column_name} = ?",
-            (value,)
-        ).fetchone()
+        with get_db_connection(cls.db_path) as conn:
+            existing_record = conn.execute(
+                f"SELECT * FROM {cls.table.table_name} WHERE {column_name} = ?",
+                (value,)
+            ).fetchone()
         return existing_record
     
     @classmethod
@@ -152,18 +156,20 @@ class AppDataStructure(DataStructure):
 
     @classmethod
     def read_by_entry_key(cls, key: str) -> Optional[Dict[str, Any]]:
-        existing_record = cls.conn.execute(
-            f"SELECT * FROM {cls.table.table_name} WHERE entry_key = ?",
-            (key,)
-        ).fetchone()
+        with get_db_connection(cls.db_path) as conn:
+            existing_record = conn.execute(
+                f"SELECT * FROM {cls.table.table_name} WHERE entry_key = ?",
+                (key,)
+            ).fetchone()
         return existing_record
 
     @classmethod
     def read_by_input_key(cls, key: str) -> Optional[Dict[str, Any]]:
-        existing_record = cls.conn.execute(
-            f"SELECT * FROM {cls.table.table_name} WHERE input_data_key = ?",
-            (key,)
-        ).fetchone()
+        with get_db_connection(cls.db_path) as conn:
+            existing_record = conn.execute(
+                f"SELECT * FROM {cls.table.table_name} WHERE input_data_key = ?",
+                (key,)
+            ).fetchone()
         return existing_record
 
     @classmethod
@@ -178,15 +184,16 @@ class AppDataStructure(DataStructure):
         Raises:
             ValueError: If updated data does not conform to the schema.
         """
-        existing_data = cls.read(cls.conn, row_id)
-        if not existing_data:
-            raise KeyError(f"No entry found with row ID '{row_id}' in {cls.name}.")
+        with get_db_connection(cls.db_path) as conn:
+            existing_data = cls.read(conn, row_id)
+            if not existing_data:
+                raise KeyError(f"No entry found with row ID '{row_id}' in {cls.name}.")
 
-        existing_data.update(updates)
-        if not cls.verify_structure(existing_data):
-            raise ValueError(f"Updated data does not conform to {cls.name} format.")
+            existing_data.update(updates)
+            if not cls.verify_structure(existing_data):
+                raise ValueError(f"Updated data does not conform to {cls.name} format.")
 
-        cls.table.update_record(cls.conn, row_id, updates)
+            cls.table.update_record(conn, row_id, updates)
 
     @classmethod
     def delete(cls, row_id: int) -> None:
@@ -196,7 +203,8 @@ class AppDataStructure(DataStructure):
         Args:
             row_id (int): Row ID to delete.
         """
-        cls.table.delete_record(cls.conn, row_id)
+        with get_db_connection(cls.db_path) as conn:
+            cls.table.delete_record(conn, row_id)
 
     @classmethod
     def list_all(cls) -> List[Dict[str, Any]]:
@@ -209,7 +217,8 @@ class AppDataStructure(DataStructure):
         Returns:
             List[Dict[str, Any]]: A list of records.
         """
-        return cls.table.fetch_all(cls.conn)
+        with get_db_connection(cls.db_path) as conn:
+            return cls.table.fetch_all(conn)
 
     @classmethod
     def fetch_all_entry_keys(cls):

@@ -1,23 +1,23 @@
-import hashlib
+from blake3 import blake3
 import time
 from PIL import Image
 from PIL.ExifTags import TAGS
 
 def file_hash(file_path) -> str:
     """
-    Takes the file path of an image and produces an
-    md5 hash of the image for image identification
+    Takes the file path of an image and produces a
+    BLAKE3 hash of the image for image identification.
     """
-    md5 = hashlib.md5()
+    blake3_hash = blake3()
 
     with open(file_path, "rb") as f:
         while True:
             data = f.read(65536)
             if not data:
                 break
-            md5.update(data)
+            blake3_hash.update(data)
 
-    return md5.hexdigest()
+    return blake3_hash.hexdigest()
 
 def extract_raw(file_path) -> ...:
     """

@@ -28,13 +28,13 @@ class AppSearch(Search):
         return "No help text available."
     
     @classmethod
-    def generate_thumbnail(cls, result: dict, thumbnail_size=(128, 128)) -> Image.Image | None:
+    def generate_thumbnail(cls, result: dict, thumbnail_size=(300, 300)) -> Image.Image | None:
         """
         Attempts to find an associated file and generate a thumbnail.
         
         Args:
             result (dict): A dictionary containing a "file_path" key or references a file.
-            thumbnail_size (tuple, optional): The size of the generated thumbnail. Defaults to (128, 128).
+            thumbnail_size (tuple, optional): The size of the generated thumbnail.
         
         Returns:
             Image.Image | None: The generated thumbnail image, or None if the file is invalid.
@@ -65,8 +65,9 @@ class AppSearch(Search):
         if file_path and os.path.exists(file_path):
             try:
                 with Image.open(file_path) as img:
-                    img.thumbnail(thumbnail_size)  # Modify the image in-place
-                    return img.copy()  # Return a copy to ensure it's not closed when the context manager exits
+                    img = img.convert("RGBA")  # or "RGBA" if transparency needed
+                    img.thumbnail((256, 256), Image.Resampling.LANCZOS)
+                    return img.copy()
             except Exception as e:
                 logger.warning(f"Error generating thumbnail for {file_path}: {e}")
         

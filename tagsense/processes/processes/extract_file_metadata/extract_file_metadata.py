@@ -30,14 +30,13 @@ class ExtractFileMetadataProcess(AppProcess):
     output: AppDataStructure = FileMetadata
 
     @classmethod
-    def execute(cls, input_data_key: str, output_callback=None) -> Tuple[str, Optional[dict]]:
+    def execute(cls, input_data_key: str) -> Tuple[str, Optional[dict]]:
         """
         Main entry point for metadata extraction.
         Resolves the file path from DB, extracts metadata, and inserts
         results into the file metadata table.
         """
-        if output_callback:
-            output_callback(f"Extracting {cls.name}...\n")
+        print(f"Running {cls.name}...\n")
 
         # ****
         # Check if the process has already been run
@@ -45,8 +44,7 @@ class ExtractFileMetadataProcess(AppProcess):
         reference_msg = f"{input_data_key} from {cls.input.name}"
         if existing:
             msg = f"{cls.name} already executed for {reference_msg}. Skipping."
-            if output_callback:
-                output_callback(msg + "\n")
+            print(msg + "\n")
             return (msg, None)
         
         # ****
@@ -55,8 +53,7 @@ class ExtractFileMetadataProcess(AppProcess):
         file_record = cls.input.read_by_entry_key(input_data_key)
         if not file_record:
             msg = "No matching file record found in database."
-            if output_callback:
-                output_callback(msg + "\n")
+            print(msg + "\n")
             return (msg, None)
 
         file_path: str = file_record["file_path"]
@@ -64,8 +61,7 @@ class ExtractFileMetadataProcess(AppProcess):
 
         # Extract metadata
         metadata_dict = cls._extract_metadata_for_filetype(file_extension, file_path)
-        if output_callback:
-            output_callback(f"Extracted metadata: {metadata_dict}\n")
+        print(f"Extracted metadata: {metadata_dict}\n")
 
         # Insert into file metadata table
         data = {"metadata": json.dumps(metadata_dict)}
@@ -77,8 +73,7 @@ class ExtractFileMetadataProcess(AppProcess):
         )
 
         msg = f"{cls.name} process completed for {reference_msg}."
-        if output_callback:
-            output_callback(msg + "\n")
+        print(msg + "\n")
         return (msg, data)
 
     @classmethod

@@ -5,13 +5,20 @@ Widgets for the application.
 """
 
 # **** IMPORTS ****
+import os
+import io
+import sys
 import time
+import select
+import threading
 import logging
+import contextlib
+import traceback
 from PIL import ImageQt
 from typing import List, Optional, Any, Dict, Tuple
 
 from PyQt6.QtGui import QPixmap, QIcon
-from PyQt6.QtCore import pyqtSignal, Qt, QTimer, QSize
+from PyQt6.QtCore import pyqtSignal, Qt, QTimer, QSize, QObject, QThread
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QComboBox, QPushButton,
     QTableWidget, QStackedWidget, QListWidget, QTableWidgetItem, QLabel,
@@ -145,19 +152,19 @@ class CustomGridTableWidget(QWidget):
 
         # ****
         # Fetch results
-        results = self.current_search.fetch_results(self.entry_whitelist, self.entry_blacklist)
+        self.results = self.current_search.fetch_results(self.entry_whitelist, self.entry_blacklist)
         
         # ****
         # Check if there are any results
-        if not results:
+        if not self.results:
             self.table_widget.setColumnCount(0)
             return
-        for item in results:  # Add preview key to each item
+        for item in self.results:  # Add preview key to each item
             item["preview"] = ""
 
         # ****
         # Prepare table
-        columns = list(results[0].keys())
+        columns = list(self.results[0].keys())
         self.table_widget.setColumnCount(len(columns))
         self.table_widget.setHorizontalHeaderLabels(columns)
         self.table_widget.horizontalHeader().setStretchLastSection(True)
@@ -173,7 +180,7 @@ class CustomGridTableWidget(QWidget):
 
         # ****
         # Populate data view
-        for row_idx, record in enumerate(results):
+        for row_idx, record in enumerate(self.results):
             # ****
             # Table view
             self.table_widget.insertRow(row_idx)
@@ -188,7 +195,7 @@ class CustomGridTableWidget(QWidget):
             if pixmap.isNull():
                 thumbnail_item.setText(f"idx: {row_idx}\nNo thumbnail")
             else:
-                scaled_pix = pixmap.scaled(128, 128, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                scaled_pix = pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
                 thumbnail_item.setIcon(QIcon(scaled_pix))
 
             thumbnail_item.setData(Qt.ItemDataRole.UserRole, row_idx)
@@ -208,12 +215,20 @@ class CustomGridTableWidget(QWidget):
         if not self.current_search:
             return
         row_idx = item.row()
-        self.open_detail_window(self.current_search, row_idx)
+        item_data = self.results[row_idx]
+        entry_key = item_data.get('entry_key')
+        search_results = self.current_search.fetch_results()
+        item_index = next(i for i, d in enumerate(search_results) if d.get('entry_key') == entry_key)
+        self.open_detail_window(self.current_search, item_index)
 
     def handle_grid_item_double_click(self, item: QListWidgetItem) -> None:
         """Opens detail window when a user double-clicks a thumbnail item."""
         row_idx = self.grid_widget.row(item)
-        self.open_detail_window(self.current_search, row_idx)
+        item_data = self.results[row_idx]
+        entry_key = item_data.get('entry_key')
+        search_results = self.current_search.fetch_results()
+        item_index = next(i for i, d in enumerate(search_results) if d.get('entry_key') == entry_key)
+        self.open_detail_window(self.current_search, item_index)
 
     def open_detail_window(self, search: Search, record_idx: int) -> None:
         """Opens a window for details on a specific data item."""
@@ -252,6 +267,102 @@ class CustomGridTableWidget(QWidget):
         ]
         return dict(zip(headers, values))
 
+class OutputRouter(QObject):
+    output_ready = pyqtSignal(str)
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            instance = super().__new__(cls)
+            super(OutputRouter, instance).__init__()  # 💥 call super init *once* here
+            cls._instance = instance
+        return cls._instance
+
+    def write(self, message):
+        if message.strip():
+            self.output_ready.emit(message)
+
+    def flush(self):
+        pass
+
+
+
+class ProcessWorkerBase(QObject):
+    output = pyqtSignal(str)
+    error = pyqtSignal(str)
+    finished = pyqtSignal(str, dict)
+
+    def __init__(self, process):
+        super().__init__()
+        self.process = process
+
+    def _emit_output_from_callable(self, callable_fn):
+        stdout_r, stdout_w = os.pipe()
+        stderr_r, stderr_w = os.pipe()
+
+        result_container = {}
+
+        def read_fd(fd, emit_fn, label):
+            try:
+                with os.fdopen(fd, 'r', encoding='utf-8', errors='ignore') as stream:
+                    for line in stream:
+                        emit_fn(f"{label}: {line.rstrip()}")
+            except Exception as e:
+                emit_fn(f"ERR: Reader thread error: {e}")
+
+        stdout_thread = threading.Thread(target=read_fd, args=(stdout_r, self.output.emit, "OUT"), daemon=True)
+        stderr_thread = threading.Thread(target=read_fd, args=(stderr_r, self.output.emit, "ERR"), daemon=True)
+        stdout_thread.start()
+        stderr_thread.start()
+
+        real_stdout = os.dup(1)
+        real_stderr = os.dup(2)
+
+        try:
+            os.dup2(stdout_w, 1)
+            os.dup2(stderr_w, 2)
+
+            result_container["result"] = callable_fn()
+
+        except Exception as e:
+            self.error.emit(f"Exception: {str(e)}\n{traceback.format_exc()}")
+            result_container["result"] = ("Error", {})  # Ensure dict return
+
+        finally:
+            sys.stdout.flush()
+            sys.stderr.flush()
+
+            os.dup2(real_stdout, 1)
+            os.dup2(real_stderr, 2)
+
+            os.close(stdout_w)
+            os.close(stderr_w)
+
+            stdout_thread.join(timeout=2)
+            stderr_thread.join(timeout=2)
+
+        return result_container["result"]
+
+class ExecuteProcessWorker(ProcessWorkerBase):
+    def __init__(self, process, input_keys: list[str]):
+        super().__init__(process)
+        self.input_keys = input_keys
+
+    def run(self):
+        final_msg, final_data = None, {}
+        try:
+            for key in self.input_keys:
+                msg, data = self._emit_output_from_callable(
+                    lambda: self.process.execute(input_data_key=key)
+                )
+                final_msg, final_data = msg, data
+        except Exception:
+            pass  # Error already emitted
+        finally:
+            self.finished.emit(final_msg or "Error", final_data or {})
+
+
+
 class RunProcessesWidget(QWidget):
     process_completion_refresh: pyqtSignal = pyqtSignal()
 
@@ -262,6 +373,11 @@ class RunProcessesWidget(QWidget):
         
         self._init_ui()
         self._init_processes_ui()
+
+        router = OutputRouter()
+        router.output_ready.connect(self.output_text.appendPlainText)
+        sys.stdout = router
+        sys.stderr = router
         
         
     def _init_ui(self) -> None:
@@ -314,6 +430,7 @@ class RunProcessesWidget(QWidget):
         self.process_rows = []
         self.process_start_times = {}
         self.process_end_times = {}
+        self.current_process = None
         self.current_process_index = None
 
         # Timer to time process execution
@@ -421,7 +538,7 @@ class RunProcessesWidget(QWidget):
         self.process_completion_refresh.emit()
         
     def run_selected_processes(self) -> None:
-        """Runs the selected processes in order."""
+        """Runs the selected processes in order asynchronously."""
         logger.info("Running selected processes.")
         
         # Find checked processes
@@ -446,9 +563,10 @@ class RunProcessesWidget(QWidget):
 
         # Prep for processing
         self.output_text.clear()
-        
-        # Process items
-        process_items = list(zip(
+        self.current_process_item_index = 0
+
+        # Store selected process items
+        self.process_items = list(zip(
             self.process_checkboxes,
             self.processes,
             self.process_lineedits,
@@ -457,108 +575,126 @@ class RunProcessesWidget(QWidget):
             range(len(self.process_checkboxes))
         ))
 
-        # ****
-        def process_next(index: int) -> None:
-            
-            # ****
-            # Stop processing if all done
-            if index >= len(process_items):
-                self.status_update_timer.stop()
-                # Clear highlight for all processes
-                for _, _, _, _, row_widget, _ in process_items:
-                    row_widget.setStyleSheet("")
-                return
+        # Filter to selected only
+        self.process_items = [item for item in self.process_items if item[0].isChecked()]
 
-            # ****
-            # Get process-related UI elements and metadata
-            checkbox, process, name_edit, status_edit, row_widget, process_idx = process_items[index]
-            
-            # ****
-            # Run process if checked
-            if checkbox.isChecked():
-                name_edit: QLineEdit
-                logger.info(f"Executing process: {name_edit.text()}")
-                self.current_process_index = process_idx
-                # Process times
-                self.process_start_times[process_idx] = time.time()
-                self.process_end_times[process_idx] = None  # Ensure end time is reset
-                # Highlight Row
-                row_widget: QWidget
-                row_widget.setStyleSheet("background-color: #FFFACD;")
-                # Update status
-                status_edit: QLineEdit
-                status_edit.setText("Processing...")
-                
-                # Start timer
-                if not self.status_update_timer.isActive():
-                    self.status_update_timer.start(1000)
-                    
-                # Create divider
-                divider = create_divider(name_edit.text(), total_width=50)
-                self.output_text.appendPlainText(divider + "\n")
+        # Start processing the first item
+        self._process_next()
 
-                # Send back output
-                def output_callback(message: str) -> None:
-                    self.output_text.appendPlainText(message)
-                    
-                # ****
-                # Run processes
-                msg, data = self.run_process(process, output_callback)
-                        
-                # ****
-                # Process completion
-                success = self.handle_process_completion(process, msg, data)
+    def _process_next(self) -> None:
+        """Runs the next process in the queue (if any)."""
+        index = self.current_process_item_index
 
-                # ****
-                # Completion updates
-                end_time = time.time()
-                self.process_end_times[process_idx] = end_time
-                duration = end_time - self.process_start_times[process_idx]
-                if process.deterministic and success:
-                    checkbox: QCheckBox
-                    status_edit.setText("Completed")
-                    checkbox.setChecked(False)
-                    checkbox.setDisabled(True)
-                elif success:
-                    status_edit.setText("Completed")
-                else:
-                    status_edit.setText("Failed")
-                    
-                # Change row color to indicate completion
-                row_widget.setStyleSheet("background-color: lightgray;")
-                status_edit.setText(f"Done at {time.ctime(end_time)} (took {int(duration)}s)")
-            else:
-                status_edit.setText("Skipped")
-                
-            # ****
-            # Auto-scroll to keep the latest process visible
+        # Done
+        if index >= len(self.process_items):
+            self.status_update_timer.stop()
+            for _, _, _, _, row_widget, _ in self.process_items:
+                row_widget.setStyleSheet("")
+            self.current_process = None
+            self.current_process_index = None
+            return
+
+        # Unpack next item
+        checkbox, process, name_edit, status_edit, row_widget, process_idx = self.process_items[index]
+
+        # Track process
+        self.current_process = process
+        self.current_process_index = process_idx
+
+        # Setup UI state
+        logger.info(f"Executing process: {name_edit.text()}")
+        self.process_start_times[process_idx] = time.time()
+        self.process_end_times[process_idx] = None
+        row_widget.setStyleSheet("background-color: #FFFACD;")
+        status_edit.setText("Processing...")
+
+        if not self.status_update_timer.isActive():
+            self.status_update_timer.start(1000)
+
+        divider = create_divider(name_edit.text(), total_width=50)
+        self.output_text.appendPlainText(divider + "\n")
+
+        # Run process (async)
+        self.run_process(process)
+
+
+
+    def run_process(self, process: Any):
+        """Runs the process asynchronously using a worker thread."""
+        if process.input not in self.data_structures_to_entry_keys:
+            error_msg = f"Error: Missing input data for {process.name}."
+            self.handle_error(error_msg)
+            self.handle_finished(error_msg, None)
+            return
+
+        input_keys = self.data_structures_to_entry_keys[process.input]
+        self.run_worker(ExecuteProcessWorker, process, input_keys)
+    
+    def run_worker(self, worker_class, *args):
+        self.thread = QThread()
+        self.worker = worker_class(*args)
+        self.worker.moveToThread(self.thread)
+
+        self.thread.started.connect(self.worker.run)
+        self.worker.output.connect(self.handle_output)
+        self.worker.error.connect(self.handle_error)
+        self.worker.finished.connect(self.handle_finished)
+
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+
+        self.thread.start()
+
+    def handle_output(self, text):
+        print(text)
+
+    def handle_error(self, text):
+        print("Error:", text)
+
+    def handle_finished(self, msg, data):
+        print("Done:", msg, data)
+        
+        # Call process completion
+        if hasattr(self, "current_process") and self.current_process is not None:
+            process = self.current_process
+            process_idx = self.current_process_index
+
+            # UI elements
+            status_edit = self.process_status_lineedits[process_idx]
+            checkbox = self.process_checkboxes[process_idx]
+            row_widget = self.process_rows[process_idx]
+
+            # Mark end time
+            end_time = time.time()
+            self.process_end_times[process_idx] = end_time
+            duration = end_time - self.process_start_times[process_idx]
+
+            # Handle completion logic
+            success = self.handle_process_completion(process, msg, data)
+
+            if process.deterministic and success:
+                checkbox.setChecked(False)
+                checkbox.setDisabled(True)
+
+            completion_status = "Failed"
+            completion_color = "red"
+            if success:
+                completion_status = "Completed"
+                completion_color = "lightgray"
+
+            row_widget.setStyleSheet(f"background-color: {completion_color};")
+            status_edit.setText(f"{completion_status} at {time.ctime(end_time)} (took {int(duration)}s)")
+
+            # Scroll to keep the latest in view
             QTimer.singleShot(100, lambda: self.processes_scroll_area.verticalScrollBar().setValue(
                 self.processes_scroll_area.verticalScrollBar().maximum()
             ))
 
-            # ****
-            # Schedule next process with a small delay
-            QTimer.singleShot(300, lambda: process_next(index + 1))
-                    
-        # Start processing
-        process_next(0)
+            # Continue to next process in the filtered list
+            self.current_process_item_index += 1
+            QTimer.singleShot(300, self._process_next)
 
-    def run_process(self, process: Any, output_callback) -> Tuple[str, dict]:
-        msg, data = (None, None)
-        if process.input not in self.data_structures_to_entry_keys:
-            msg, data = (f"Error: Missing input data for {process.name}.", None)
-        else:
-            try:
-                for entry_key in self.data_structures_to_entry_keys[process.input]:
-                    msg, data = process.execute(
-                        input_data_key=entry_key,
-                        output_callback=output_callback
-                    )
-            except Exception as e:
-                msg, data = (f"Error in {process.name}: {e}", None)
-                logger.error(msg)
-                raise e 
-        return msg, data
     
     def handle_process_completion(self, process, msg, data) -> bool:
         # Record data for subsequent processes if successful

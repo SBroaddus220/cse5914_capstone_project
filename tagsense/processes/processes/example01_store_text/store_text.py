@@ -27,12 +27,11 @@ class StoreText(AppProcess):
     output: AppDataStructure = StoredText
 
     @classmethod
-    def execute(cls, input_data_key: str, output_callback=None) -> Tuple[str, Optional[dict]]:
+    def execute(cls, input_data_key: str) -> Tuple[str, Optional[dict]]:
         """
         Stores a single run entry.
         """
-        if output_callback:
-            output_callback(f"Running {cls.name}...\n")
+        print(f"Running {cls.name}...\n")
 
         # ****
         # Check if the process has already been run
@@ -40,8 +39,7 @@ class StoreText(AppProcess):
         reference_msg = f"{input_data_key} from {cls.input.name}"
         if existing:
             msg = f"{cls.name} already executed for {reference_msg}. Skipping."
-            if output_callback:
-                output_callback(msg + "\n")
+            print(msg + "\n")
             return (msg, None)
 
         # ****
@@ -57,8 +55,7 @@ class StoreText(AppProcess):
         )
 
         msg = f"{cls.name} completed for {reference_msg}."
-        if output_callback:
-            output_callback(msg + "\n")
+        print(msg + "\n")
         return (msg, data)
     
 # ****

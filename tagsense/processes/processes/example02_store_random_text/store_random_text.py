@@ -32,12 +32,11 @@ class StoreRandomText(AppProcess):
     deterministic: bool = False
 
     @classmethod
-    def execute(cls, input_data_key: str, output_callback=None) -> Tuple[str, Optional[dict]]:
+    def execute(cls, input_data_key: str) -> Tuple[str, Optional[dict]]:
         """
         Appends text to an existing record or creates a new record.
         """
-        if output_callback:
-            output_callback("Running append text process...\n")
+        print(f"Running {cls.name}...\n")
             
         # ****
         # Create a new record. Doesn't need to check if the process has already been run
@@ -53,8 +52,7 @@ class StoreRandomText(AppProcess):
 
         reference_msg = f"{input_data_key} from {cls.input}"
         msg = f"{cls.name} completed for {reference_msg}."
-        if output_callback:
-            output_callback(msg + "\n")
+        print(msg + "\n")
         return (msg, data)
 
 # ****
