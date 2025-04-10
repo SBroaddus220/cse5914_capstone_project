@@ -535,7 +535,6 @@ class RunProcessesWidget(QWidget):
     def _handle_process_button_clicked(self) -> None:
         print("handling buttton click")
         self.run_selected_processes()
-        self.process_completion_refresh.emit()
         
     def run_selected_processes(self) -> None:
         """Runs the selected processes in order asynchronously."""
@@ -685,6 +684,8 @@ class RunProcessesWidget(QWidget):
 
             row_widget.setStyleSheet(f"background-color: {completion_color};")
             status_edit.setText(f"{completion_status} at {time.ctime(end_time)} (took {int(duration)}s)")
+
+            self.process_completion_refresh.emit()
 
             # Scroll to keep the latest in view
             QTimer.singleShot(100, lambda: self.processes_scroll_area.verticalScrollBar().setValue(

@@ -246,6 +246,7 @@ class MainWindow(QMainWindow):
 
     def _handle_populate_data_view(self) -> None:
         """Handle the window refresh."""
+        print("calling populate data view")
         self.data_view.populate_data_view()
 
     def _handle_file_import_dialog_exec(self) -> None:

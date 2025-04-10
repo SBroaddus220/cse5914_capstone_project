@@ -87,6 +87,7 @@ class FileImport(QDialog):
         # ****
         # Processes
         self.run_selected_processes_widget = RunFileProcessesWidget(self.processes, None, self)
+        print("emitting process completion")
         self.run_selected_processes_widget.process_completion_refresh.connect(lambda: self.process_completion_refresh.emit())
 
         # ****
