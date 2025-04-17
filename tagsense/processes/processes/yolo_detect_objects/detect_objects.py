@@ -76,7 +76,7 @@ class DetectObjects(AppProcess):
 
         msg = f"{cls.name} process completed for {reference_msg}."
         print(msg + "\n")
-        return (msg, data)
+        return (msg, {"success": True})
 
 
 # ****
